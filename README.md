@@ -1,0 +1,11 @@
+Update Site for Bonaparte DSL
+=============
+
+This is a "GitHub Pages" repository and hosts the update site for the Bonaparte DSL eclipse pliugins.
+
+## Available Update URLs
+
+| Version | URL |
+|---|---|
+| latest | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/latest/ |
+| 5.0.6 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.0.6/ |
