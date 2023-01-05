@@ -8,6 +8,7 @@ This is a "GitHub Pages" repository and hosts the update site for the Bonaparte 
 | Version | URL |
 |---|---|
 | latest | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/latest/ |
+| 5.1.4 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.1.4/ |
 | 5.1.3 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.1.3/ |
 | 5.1.2 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.1.2/ |
 | 5.1.1 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.1.1/ |
