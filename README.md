@@ -5,6 +5,8 @@ This is a "GitHub Pages" repository and hosts the update site for the Bonaparte 
 
 ## Available Update URLs
 
+Recommendation: Use https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/latest/ to keep up to date.
+
 | Version | URL |
 |---|---|
 | latest | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/latest/ |
