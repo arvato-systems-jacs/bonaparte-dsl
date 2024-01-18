@@ -10,6 +10,7 @@ Recommendation: Use https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/
 | Version | URL |
 |---|---|
 | latest | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/latest/ |
+| 5.3.0 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.3.0/ |
 | 5.2.0 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.2.0/ |
 | 5.1.6 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.1.6/ |
 | 5.1.5 | https://arvato-systems-jacs.github.io/bonaparte-dsl/updates/5.1.5/ |
