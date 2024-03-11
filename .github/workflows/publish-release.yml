@@ -5,9 +5,7 @@ name: Publish Release
 run-name: Publish Release ${{ inputs.release_version }}
 
 on:
-  push:
-    branches: [ "feature/**" ]
-  workflow_dispatch: # enable manual trigger
+  workflow_dispatch:
     inputs:
       release_version:
         description: 'Release Version'
@@ -42,9 +40,8 @@ jobs:
       run: |
         git config user.name 'github-actions[bot]'
         git config user.email 'github-actions[bot]@users.noreply.github.com'
-        git fetch --all
 
-#    - name: Release Packages
-#      run: mvn -B -P github -DretryFailedDeploymentCount=${{ env.DEPLOY_RETRY }} -DreleaseVersion=${{ inputs.release_version }} release:prepare release:perform
-#      env:
-#        GITHUB_TOKEN: ${{ github.token }}
+    - name: Release Packages
+      run: mvn -B -P github -DretryFailedDeploymentCount=${{ env.DEPLOY_RETRY }} -DreleaseVersion=${{ inputs.release_version }} release:prepare release:perform
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
