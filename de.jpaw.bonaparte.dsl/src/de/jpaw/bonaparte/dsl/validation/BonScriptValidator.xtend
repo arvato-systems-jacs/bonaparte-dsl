@@ -41,6 +41,7 @@ import java.util.HashMap
 import java.util.HashSet
 import java.util.Map
 import org.eclipse.emf.common.util.EList
+import org.eclipse.emf.ecore.EObject
 import org.eclipse.xtext.validation.Check
 
 import static de.jpaw.bonaparte.dsl.generator.java.JavaXEnum.*
@@ -161,16 +162,36 @@ class BonScriptValidator extends AbstractBonScriptValidator {
     @Check
     def void checkEnumDeprecation(ElementaryDataType dt) {
         if (dt.enumType !== null) {
-            if (dt.enumType.isDeprecated)
-                warning(dt.enumType.name + " is deprecated", BonScriptPackage.Literals.ELEMENTARY_DATA_TYPE__ENUM_TYPE)
+            if (dt.enumType.isDeprecated) {
+                val containingClass = getContainingClass(dt)
+                if (containingClass === null || !containingClass.isDeprecated)
+                    warning(dt.enumType.name + " is deprecated", BonScriptPackage.Literals.ELEMENTARY_DATA_TYPE__ENUM_TYPE)
+            }
         }
         if (dt.xenumType !== null) {
-            if (dt.xenumType.isDeprecated)
-                warning(dt.xenumType.name + " is deprecated", BonScriptPackage.Literals.ELEMENTARY_DATA_TYPE__XENUM_TYPE)
+            if (dt.xenumType.isDeprecated) {
+                val containingClass = getContainingClass(dt)
+                if (containingClass === null || !containingClass.isDeprecated)
+                    warning(dt.xenumType.name + " is deprecated", BonScriptPackage.Literals.ELEMENTARY_DATA_TYPE__XENUM_TYPE)
+            }
         }
     }
 
     static final char DOT = 'c';
+
+    /**
+     * Finds the containing ClassDefinition for any EObject by traversing up the containment hierarchy.
+     * Returns null if no containing ClassDefinition is found.
+     */
+    def private ClassDefinition getContainingClass(EObject obj) {
+        var container = obj?.eContainer
+        while (container !== null) {
+            if (container instanceof ClassDefinition)
+                return container
+            container = container.eContainer
+        }
+        return null
+    }
 
     def private boolean isSubBundle(String myBundle, String extendedBundle) {
         if (extendedBundle === null)
@@ -490,8 +511,11 @@ class BonScriptValidator extends AbstractBonScriptValidator {
     @Check
     def void checkGenericsParameterList(ClassReference ref) {
         if (ref.getClassRef() !== null) {
-            if (ref.classRef.isDeprecated)
-                warning(ref.classRef.name + " is deprecated", BonScriptPackage.Literals.CLASS_REFERENCE__CLASS_REF)
+            if (ref.classRef.isDeprecated) {
+                val containingClass = getContainingClass(ref)
+                if (containingClass === null || !containingClass.isDeprecated)
+                    warning(ref.classRef.name + " is deprecated", BonScriptPackage.Literals.CLASS_REFERENCE__CLASS_REF)
+            }
             // verify that the parameters given match the definition of the class referenced
             val requiredParameters = ref.getClassRef().getGenericParameters();
             val providedParameters = ref.getClassRefGenericParms();
