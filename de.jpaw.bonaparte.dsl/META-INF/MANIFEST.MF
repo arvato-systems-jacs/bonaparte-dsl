@@ -16,7 +16,7 @@ Require-Bundle: org.eclipse.xtext,
  org.eclipse.xtend.lib;bundle-version="2.40.0",
  org.eclipse.xtext.common.types,
  org.objectweb.asm;bundle-version="9.7.1";resolution:=optional
-Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Export-Package: de.jpaw.bonaparte.dsl.scoping,
  de.jpaw.bonaparte.dsl.generator,
  de.jpaw.bonaparte.dsl.generator.java,
