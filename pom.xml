@@ -34,15 +34,15 @@
     </developers>
 
     <properties>
-        <xtextVersion>2.38.0</xtextVersion>
-        <tycho-version>4.0.12</tycho-version>
-        <mwe-version>2.21.0</mwe-version>
+        <xtextVersion>2.40.0</xtextVersion>
+        <tycho-version>4.0.13</tycho-version>
+        <mwe-version>2.23.0</mwe-version>
         <exec-plugin-version>3.5.0</exec-plugin-version>
-        <clean-plugin-version>3.4.0</clean-plugin-version>
+        <clean-plugin-version>3.5.0</clean-plugin-version>
         <dependency-plugin-version>3.8.1</dependency-plugin-version>
-        <lsp4j-version>0.23.0</lsp4j-version>
+        <lsp4j-version>0.24.0</lsp4j-version>
         <log4j-version>1.2.17</log4j-version>
-        <asm-version>9.7.1</asm-version>
+        <asm-version>9.8</asm-version>
         <release.plugin.version>3.0.1</release.plugin.version>
         <scm.plugin.version>2.1.0</scm.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -165,7 +165,7 @@
         <pluginManagement>
             <plugins>
                 <plugin>
-                    <groupId>org.eclipse.xtend</groupId>
+                    <groupId>org.eclipse.xtext</groupId>
                     <artifactId>xtend-maven-plugin</artifactId>
                     <version>${xtextVersion}</version>
                     <executions>
