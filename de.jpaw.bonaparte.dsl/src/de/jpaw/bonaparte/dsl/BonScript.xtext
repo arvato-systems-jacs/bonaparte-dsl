@@ -35,8 +35,8 @@ Model:
 terminal INT returns ecore::EInt: ('0'..'9')+;
 
 @Override
-terminal ML_COMMENT: '/*' !'*'-> '*/' ;     // overwrite ML_COMMENT to derive the non-Terminal JAVADOC comment
-terminal JAVADOC_COMMENT: '/**' -> '*/';    // and provide a separate JavaDoc multiline comment
+terminal ML_COMMENT: '/*' !'*'-> '*/' ;     // overwrite ML_COMMENT: require a non-'*' char after '/*' so '/**' is NOT matched here
+terminal JAVADOC_COMMENT: '/**' -> '*/';    // provide a separate JavaDoc multiline comment; note: '/**/' is not matched by either rule
 
 
 QualifiedId hidden(): 
@@ -259,6 +259,8 @@ EnumDefinition:
     (regularComment = ML_COMMENT)?
     (isDeprecated?='@Deprecated')?
     'enum' name = ID '{'
+        // Both alternatives start with ID; the parser uses LL(2) lookahead: '=' after the first ID selects
+        // the alpha-value branch, while ',' or '}' selects the plain-ID branch.
         ((values += ID (',' values += ID)*) |
          (avalues += EnumAlphaValueDefinition (',' avalues += EnumAlphaValueDefinition)*))
     '}'   
