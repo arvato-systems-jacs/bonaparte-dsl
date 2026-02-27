@@ -34,17 +34,19 @@
     </developers>
 
     <properties>
-        <xtextVersion>2.40.0</xtextVersion>
+        <min-maven.version>3.9.9</min-maven.version>
+        <xtextVersion>2.42.0</xtextVersion>
         <tycho-version>4.0.13</tycho-version>
-        <mwe-version>2.23.0</mwe-version>
-        <exec-plugin-version>3.5.0</exec-plugin-version>
+        <mwe-version>2.25.0</mwe-version>
+        <exec-plugin-version>3.6.3</exec-plugin-version>
         <clean-plugin-version>3.5.0</clean-plugin-version>
+        <enforcer.plugin.version>3.6.2</enforcer.plugin.version>
         <dependency-plugin-version>3.8.1</dependency-plugin-version>
-        <lsp4j-version>0.24.0</lsp4j-version>
+        <lsp4j-version>1.0.0</lsp4j-version>
         <log4j-version>1.2.17</log4j-version>
-        <asm-version>9.8</asm-version>
-        <release.plugin.version>3.0.1</release.plugin.version>
-        <scm.plugin.version>2.1.0</scm.plugin.version>
+        <asm-version>9.9.1</asm-version>
+        <release.plugin.version>3.3.1</release.plugin.version>
+        <scm.plugin.version>2.2.1</scm.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -118,6 +120,47 @@
                             <arch>x86_64</arch>
                         </environment>
                     </environments>
+                </configuration>
+            </plugin>
+
+            <!-- ensure consistency for tagged releases -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${enforcer.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-no-snapshots</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>enforce-maven</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <version>${min-maven.version}</version>
+                                </requireMavenVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+                <configuration>
+                    <rules>
+                        <requireReleaseDeps>
+                            <message>No snapshots dependencies allowed for final revisions!</message>
+                            <searchTransitive>true</searchTransitive>
+                            <failWhenParentIsSnapshot>true</failWhenParentIsSnapshot> 
+                            <onlyWhenRelease>true</onlyWhenRelease>
+                        </requireReleaseDeps>
+                    </rules>
+                    <fail>true</fail>
+                    <failFast>true</failFast>
                 </configuration>
             </plugin>
 
