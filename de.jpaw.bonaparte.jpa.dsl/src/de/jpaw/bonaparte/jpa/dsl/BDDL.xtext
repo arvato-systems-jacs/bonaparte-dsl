@@ -22,6 +22,10 @@ import "http://www.jpaw.de/bonaparte/dsl/BonScript" as pojos
 import "http://www.eclipse.org/xtext/common/JavaVMTypes" as jvmTypes    // to allow checking of referenced imports
 
 @Override
+// NOTE: PackageDefinition (inherited from BonScript) and BDDLPackageDefinition both begin with an
+// optional JAVADOC_COMMENT then the 'package' keyword. The parser must use deep lookahead/backtracking
+// to distinguish them; the first decisive difference is the mandatory 'owner' keyword present only
+// in BDDLPackageDefinition.
 Model:
     includes        += IncludeDefinition*
     imports         += ImportDefinition*
@@ -263,7 +267,7 @@ IndexDefinition:
     columns = ListOfColumns
     (nullsNotDistinct ?= 'nullsNotDistinct')?  // allows unique indexes for POSTGRES with nulls, where null is treated as regular value
     (zeroWhenNull ?= 'zeroWhenNull')?          // builds a function based index if nullable fields are included, mapping nulls to zero (or a blank)
-    (partialIndex ?= 'where' ((condition = STRING)? | (notNull ?= 'notNull')?))?
+    (partialIndex ?= 'where' (condition = STRING | notNull ?= 'notNull')?)?
 ;
 
 // by custom ScopeProvider implementation, an appropriate importedNamespace will be added here
