@@ -160,6 +160,18 @@ class MakeRelationships {
             «ENDIF»
             «m.relationship.writeFGS(e, fieldVisibility, m.o2mTypeName, ''' = new «m.getInitializer»()''', false, false)»
         «ENDFOR»
+
+        «FOR m : e.manyToManys»
+            @ManyToMany«optArgs(
+                if (m.relationship.fetchType !== null) '''fetch=FetchType.«m.relationship.fetchType»'''
+            )»
+            @JoinTable(
+                name = "«m.tablename»",
+                joinColumns = @JoinColumn(name = "«m.ref»"),
+                inverseJoinColumns = @JoinColumn(name = "«m.inverseRef»")
+            )
+            «m.relationship.writeFGS(e, fieldVisibility, "Set<" + m.relationship.childObject.name + ">", ''' = new HashSet<>()''', false, false)»
+        «ENDFOR»
     '''
     }
 

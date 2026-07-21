@@ -183,6 +183,7 @@ EntityDefinition:
         (('@ManyToOne'  manyToOnes  += ManyToOne ) |
          ('@OneToOne'   oneToOnes   += OneToOne  ) |
          ('@OneToMany'  oneToManys  += OneToMany ) |
+         ('@ManyToMany' manyToManys += ManyToMany ) |
          ('@Embeddable' embeddables += EmbeddableUse) |
          ('@ElementCollection' elementCollections += ElementCollectionRelationship ) |
          ('@NamedEntityGraph' neg += NamedEntityGraph)
@@ -232,6 +233,12 @@ OneToOne:
     (cascade       ?= 'cascade')?
     (orphanRemoval ?= 'orphanRemoval')?
     ('join'  joinColumnDirective = STRING)?
+;
+
+ManyToMany:
+    relationship = Relationship
+    'tablename' tablename = ID
+    'join' ref = ID inverseRef = ID
 ;
 
 ElementCollectionRelationship:
