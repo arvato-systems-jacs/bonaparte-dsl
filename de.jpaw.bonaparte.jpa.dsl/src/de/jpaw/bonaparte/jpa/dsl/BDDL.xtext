@@ -30,7 +30,7 @@ Model:
      bddlPackages   += BDDLPackageDefinition
     )*
 ;
-    
+
 IncludeDefinition:
     'include' importURI=STRING
 ;
@@ -38,7 +38,7 @@ IncludeDefinition:
 DefaultsDefinition:
     'default' {DefaultsDefinition}
     ('tablenamepattern' namePattern=STRING ('dropSuffix' dropSuffix=STRING)?)?
-    (('tablespacepattern' tablespacePattern=STRING) | 
+    (('tablespacepattern' tablespacePattern=STRING) |
      ('tablespace' tablespaceName=ID ('index' indexTablespacename=ID)?))?
     ';'
 ;
@@ -47,7 +47,7 @@ enum Permission:
     SELECT='SELECT'|INSERT='INSERT'|UPDATE='UPDATE'|DELETE='DELETE';
 
 enum VectorIndexType:
-	HNSW="HNSW" | IVFFLAT="IVFFlat";
+    HNSW="HNSW" | IVFFLAT="IVFFlat";
 
 enum DistanceMetricType:
     L1="L1" | L2="L2" | COSINE="Cosine" | EUCLIDEAN="Euclidean" | MANHATTAN="Manhattan" | JACCARD="Jaccard" | HAMMING="Hamming" | NEGATIVE_INNER_PRODUCT="NegativeInnerProduct";
@@ -64,11 +64,11 @@ GrantCategoryDefinition:
     '}'
 ;
 
-ColumnNameMapping: 
+ColumnNameMapping:
     javaName = ID ':' sqlName = ID ';'
 ;
 
-ColumnNameMappingDefinition: 
+ColumnNameMappingDefinition:
     'nameMappings' name=ID
     ('extends' extendsMapping = [ColumnNameMappingDefinition|QualifiedId])?
     '{'
@@ -82,10 +82,10 @@ TableCategoryDefinition:
             (('autoSetter' autoSetter=QualifiedId) | ('entityListener' entityListener=[jvmTypes::JvmGenericType|QualifiedId]))?
         )?
         ('tablenamepattern' namePattern=STRING ('dropSuffix' dropSuffix=STRING)?)?
-        (('tablespacepattern' tablespacePattern=STRING) | 
+        (('tablespacepattern' tablespacePattern=STRING) |
          ('tablespace' tablespaceName=ID ('index' indexTablespacename=ID)?))?
         (('history' historyCategory=[TableCategoryDefinition|QualifiedId] ('sequence' historySequenceName=ID)?) |
-         ('historyColumns' historySequenceColumn = ID ',' historyChangeTypeColumn = ID (actualData?='actualData')?))?  
+         ('historyColumns' historySequenceColumn = ID ',' historyChangeTypeColumn = ID (actualData?='actualData')?))?
         (requiresPk ?= 'requiresPK')?
         (doBeanVal ?= 'beanVal')?
         ('grants' grantGroup = [GrantCategoryDefinition|QualifiedId])?
@@ -103,10 +103,11 @@ BDDLPackageDefinition:
         'prefix' dbPrefix = ID
         (noUserTypes ?= 'noUserTypes')?     // do not use JodaTime and ByteArray in entity classes directly, but convert in getters/setters
         (allSerializable ?= 'allSerializable')?
-       (forceSetters ?= 'forceSetters' (setterVisibility = XVisibility)?)?    // force setters for all ManyToOnes of all entities
-    '{' 
+        (forceSetters ?= 'forceSetters' (setterVisibility = XVisibility)?)?    // force setters for all ManyToOnes of all entities
+        (noViews ?= 'noViews')?
+    '{'
         ('fields' visibility=Visibility ';')?
-        (grantCategories += GrantCategoryDefinition  
+        (grantCategories += GrantCategoryDefinition
         | nameMappings += ColumnNameMappingDefinition
         | tableCategories += TableCategoryDefinition
         | entities += EntityDefinition
@@ -125,7 +126,7 @@ EmbeddableDefinition:
     'embeddable' name = ID 'is' pojoType=[pojos::ClassDefinition|QualifiedId]
     (doBeanVal ?= 'beanVal')?
     '{'
-        ('nameMappings' nameMappingGroup = [ColumnNameMappingDefinition|QualifiedId])?        
+        ('nameMappings' nameMappingGroup = [ColumnNameMappingDefinition|QualifiedId])?
         ('@Embeddable' embeddables += EmbeddableUse)*
     '}'
 ;
@@ -150,7 +151,7 @@ EntityDefinition:
     ('@Generator' '(' (doMapper?= 'doMapper' | noJava?='noJava' | noMapper?='noMapper' | noKeyMapper?='noKeyMapper' | noDDL?='noDDLs') ')')?
     (generator = ('@SequenceGenerator' | '@TableGenerator') generatorName = ID ('(' generatorValue = STRING ')')?)?
     (isAbstract?='abstract')?  // abstract means mappedSuperclass
-    'entity' name = ID      
+    'entity' name = ID
         // 'type' tabletype=TableType
         ('category' optTableCategory=[TableCategoryDefinition|QualifiedId])?
         'is' pojoType=[pojos::ClassDefinition|QualifiedId]
@@ -168,13 +169,14 @@ EntityDefinition:
     '{'
         ('fields' visibility=Visibility ';')?
         (forceSetters ?= 'forceSetters' (setterVisibility = XVisibility)?)?  // enforce setters for all ManyToOne relationships
+        (noViews ?= 'noViews')?
         (cacheable ?= 'cacheable')?
         // EclipseLink specific caching: do not use
         ('cache'  cacheSize=INT 'objects' 'for' cacheExpiry=INT cacheExpiryScale = ('second'|'seconds' | 'minute'|'minutes' | 'hour'|'hours' | 'day'|'days'))?
         ('tenantClass' tenantClass = [pojos::ClassDefinition|QualifiedId] (tenantInJoinedTables?='join')?)?
         ('tenant' tenantId = SingleColumn)?
         // ('foreign' 'keys' '{' foreignKeys += ForeignKeyDefinition* '}')?
-        ('nameMappings' nameMappingGroup = [ColumnNameMappingDefinition|QualifiedId])?        
+        ('nameMappings' nameMappingGroup = [ColumnNameMappingDefinition|QualifiedId])?
         ('pk'     ('is' pkPojo = [pojos::ClassDefinition|QualifiedId])? (pk = ListOfColumns (isIdGenerated?='generated' ('=' generatedIdDetails=STRING)?)?)? )?
         ('index'  index   += IndexDefinition)*
         ('collections' '{' collections += CollectionDefinition* '}')?               // unused???
@@ -184,8 +186,8 @@ EntityDefinition:
          ('@Embeddable' embeddables += EmbeddableUse) |
          ('@ElementCollection' elementCollections += ElementCollectionRelationship ) |
          ('@NamedEntityGraph' neg += NamedEntityGraph)
-        )* 
-    '}'       
+        )*
+    '}'
 ;
 
 NamedEntityGraph:
@@ -208,9 +210,9 @@ ManyToOne:
 ;
 
 Relationship:
-    childObject = [EntityDefinition|QualifiedId] name = ID 
+    childObject = [EntityDefinition|QualifiedId] name = ID
     (fetchType = ('LAZY' | 'EAGER'))?
-    ('for' referencedFields = ListOfColumns )  // later: add alternative for local field 
+    ('for' referencedFields = ListOfColumns )  // later: add alternative for local field
     (forceSetters ?= 'forceSetters' (setterVisibility = XVisibility)?)?
 ;
 
@@ -227,7 +229,7 @@ OneToMany:
 
 OneToOne:
     relationship = Relationship
-    (cascade       ?= 'cascade')?    
+    (cascade       ?= 'cascade')?
     (orphanRemoval ?= 'orphanRemoval')?
     ('join'  joinColumnDirective = STRING)?
 ;
@@ -238,8 +240,8 @@ ElementCollectionRelationship:
     'in' tablename = ID
     '(' keyColumns += ID (',' keyColumns += ID )* ')'
     ('extraKey' extraKeyColumns += ID (',' extraKeyColumns += ID )*)?
-    ('mapKey' mapKey = ID (':' mapKeySize = INT)? )? 
-    ('historytablename' historytablename = ID)? 
+    ('mapKey' mapKey = ID (':' mapKeySize = INT)? )?
+    ('historytablename' historytablename = ID)?
 ;
 
 CollectionDefinition:
@@ -269,10 +271,10 @@ IndexDefinition:
 
 // by custom ScopeProvider implementation, an appropriate importedNamespace will be added here
 ListOfColumns:
-    '(' columnName += [pojos::FieldDefinition] (',' columnName += [pojos::FieldDefinition])* ')'    
+    '(' columnName += [pojos::FieldDefinition] (',' columnName += [pojos::FieldDefinition])* ')'
 ;
 
 // by custom ScopeProvider implementation, an appropriate importedNamespace will be added here
 SingleColumn:
-    singleColumnName = [pojos::FieldDefinition]    
+    singleColumnName = [pojos::FieldDefinition]
 ;

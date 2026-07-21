@@ -49,6 +49,7 @@ import static de.jpaw.bonaparte.jpa.dsl.generator.sql.SqlEnumOutOracle.*
 import static extension de.jpaw.bonaparte.dsl.generator.XUtil.*
 import static extension de.jpaw.bonaparte.jpa.dsl.generator.YUtil.*
 import static extension de.jpaw.bonaparte.jpa.dsl.generator.sql.SqlViewOut.*
+import de.jpaw.bonaparte.jpa.dsl.bDDL.BDDLPackageDefinition
 
 class SqlDDLGeneratorMain extends AbstractGenerator {
     static Logger LOGGER = Logger.getLogger(SqlDDLGeneratorMain)
@@ -167,6 +168,15 @@ class SqlDDLGeneratorMain extends AbstractGenerator {
     }
 
     def private void makeViews(IFileSystemAccess2 fsa, EntityDefinition e, boolean withTracking, String suffix) {
+        if (e.isNoViews()) {
+            return
+        }
+        val p = e.eContainer
+        if (p instanceof BDDLPackageDefinition) {
+            if (p.isNoViews()) {
+                return
+            }
+        }
         val tablename = mkTablename(e, false) + suffix
         if (prefs.doOracleOut)
             fsa.generateFile(makeSqlFilename(e, DatabaseFlavour::ORACLE,   tablename, "View"), e.createView(DatabaseFlavour::ORACLE, withTracking, suffix))
