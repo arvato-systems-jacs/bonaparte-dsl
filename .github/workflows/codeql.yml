@@ -11,7 +11,7 @@ on:
     - cron: '42 14 * * 0'
 
 env:
-  JAVA_VERSION_TO_USE: '17'
+  JAVA_VERSION_TO_USE: '21'
   JAVA_DISTRI_TO_USE: 'corretto'
   GITHUB_TOKEN_READ_PACKAGES: ${{ secrets.GH_WORKFLOWS_PAT_READ_PACKAGES }}
 
@@ -34,7 +34,7 @@ jobs:
         languages: java
 
     - name: Set up JDK ${{ env.JAVA_VERSION_TO_USE }} (${{ env.JAVA_DISTRI_TO_USE }})
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: ${{ env.JAVA_VERSION_TO_USE }}
         distribution: ${{ env.JAVA_DISTRI_TO_USE }}
