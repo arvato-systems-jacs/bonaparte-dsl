@@ -35,9 +35,9 @@
 
     <properties>
         <min-maven.version>3.9.9</min-maven.version>
-        <xtextVersion>2.43.0</xtextVersion>
+        <xtextVersion>2.44.0</xtextVersion>
         <tycho-version>5.0.3</tycho-version>
-        <mwe-version>2.26.0</mwe-version>
+        <mwe-version>2.27.0</mwe-version>
         <exec-plugin-version>3.6.3</exec-plugin-version>
         <clean-plugin-version>3.5.0</clean-plugin-version>
         <enforcer.plugin.version>3.6.3</enforcer.plugin.version>
