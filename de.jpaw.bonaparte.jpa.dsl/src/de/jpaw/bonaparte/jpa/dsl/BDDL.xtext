@@ -269,7 +269,9 @@ VectorIndexDefinition:
 IndexDefinition:
     (isUnique ?= 'unique')?
     (vectorIndex = VectorIndexDefinition)?     // pgvector
-    ('using' method = ID)?                 // PostGres index method (btree, hash, gist, spgist, gin, brin or user defined)
+    ('using' method = ID)?                     // PostGres index method (btree, hash, gist, spgist, gin, brin or user defined)
+    (isUppercase ?= 'uppercase')?              // function based index: uppercase of column values
+    (isLowercase ?= 'lowercase')?              // function based index: lowercase of column values
     columns = ListOfColumns
     (nullsNotDistinct ?= 'nullsNotDistinct')?  // allows unique indexes for POSTGRES with nulls, where null is treated as regular value
     (zeroWhenNull ?= 'zeroWhenNull')?          // builds a function based index if nullable fields are included, mapping nulls to zero (or a blank)

@@ -439,7 +439,7 @@ class SqlDDLGeneratorMain extends AbstractGenerator {
         «IF !doHistory»
             «FOR i : t.index»
                 CREATE «IF i.isUnique»UNIQUE «ENDIF»INDEX «tablename.indexname(i, indexCounter)» ON «tablename»«indexMethod(i.method)»«vectorIndexType(databaseFlavour, i.vectorIndex)» (
-                    «FOR c : i.columns.columnName SEPARATOR ', '»«distanceMetricType(databaseFlavour, i.vectorIndex, writeIndexColumn(c, databaseFlavour, nmd, i.zeroWhenNull))»«ENDFOR»
+                    «FOR c : i.columns.columnName SEPARATOR ', '»«distanceMetricType(databaseFlavour, i.vectorIndex, writeIndexColumn(c, databaseFlavour, nmd, i))»«ENDFOR»
                 )«writePartialIndexClause(i, databaseFlavour, nmd)»«vectorIndexWithClause(databaseFlavour, i.vectorIndex)»«IF i.nullsNotDistinct» NULLS NOT DISTINCT«ENDIF»«IF tablespaceIndex !== null» TABLESPACE «tablespaceIndex»«ENDIF»;
             «ENDFOR»
         «ENDIF»
@@ -486,9 +486,47 @@ class SqlDDLGeneratorMain extends AbstractGenerator {
     }
 
     // writes a column name for an index. support function based indexes
-    def CharSequence writeIndexColumn(FieldDefinition c, DatabaseFlavour databaseFlavour, ColumnNameMappingDefinition nmd, boolean isFunctionBased) {
+    def private CharSequence writeIndexColumn(FieldDefinition c, DatabaseFlavour databaseFlavour, ColumnNameMappingDefinition nmd, IndexDefinition ind) {
         val regular = c.name.java2sql(nmd)
-        if (isFunctionBased && !c.isNotNullField) {
+        if (ind.isIsLowercase) {
+            switch (databaseFlavour) {
+                case MSSQLSERVER: {
+                    return '''«regular»'''  // unsupported! needs extra column: ADD col_upper AS UPPER(col) PERSISTED
+                }
+                case MYSQL: {
+                    return '''(LOWER(«regular»))''' // extra parenthesis required!
+                }
+                case ORACLE: {
+                    return '''LOWER(«regular»)'''
+                }
+                case POSTGRES: {
+                    return '''LOWER(«regular»)'''
+                }
+                case SAPHANA: {
+                    return '''«regular»'''  // unsupported! needs extra column, and must be manually maintained!
+                }
+            }
+        }
+        if (ind.isIsUppercase) {
+            switch (databaseFlavour) {
+                case MSSQLSERVER: {
+                    return '''«regular»'''  // unsupported! needs extra column: ADD col_upper AS UPPER(col) PERSISTED
+                }
+                case MYSQL: {
+                    return '''(UPPER(«regular»))''' // extra parenthesis required!
+                }
+                case ORACLE: {
+                    return '''UPPER(«regular»)'''
+                }
+                case POSTGRES: {
+                    return '''UPPER(«regular»)'''
+                }
+                case SAPHANA: {
+                    return '''«regular»'''  // unsupported! needs extra column, and must be manually maintained!
+                }
+            }
+        }
+        if (ind.zeroWhenNull && !c.isNotNullField) {
             val defaulVal = if (SqlMapping.isAnAlphanumericField(c)) "' '" else "0";
             // nullable field with a zeroWhenNull directive on index
             switch (databaseFlavour) {
