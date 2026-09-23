@@ -350,13 +350,8 @@ ElementaryDataType:
            "(" (minLength=INT '..')? length=INT ")"
            (trimming   = Trimming)?
            (truncating = Truncating)?
-           ('regexp' regexp=STRING)?)
-      | (name=("unicode"|"Unicode")                            // any displayable Unicode character
-           "(" (minLength=INT '..')? length=INT ")"
-           (trimming   = Trimming)?
-           (truncating = Truncating)?
            (allowCtrls = SpecialCharsSetting)?      // Unicode fields: allow control characters
-        )
+           ('regexp' regexp=STRING)?)
       | (
            (signed = Signedness)?
            (
