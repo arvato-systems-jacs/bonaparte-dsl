@@ -43,6 +43,7 @@ public class BonScriptPreferences {
     static private final boolean doDebugOutDefault              = configReader.getProp("DebugOut", false);
     static private final boolean doDateTimeDefault              = configReader.getProp("DateTime", true);
     static private final boolean noXmlDefault                   = configReader.getProp("noXML", false);
+    static private final boolean doTypeScriptDefault            = configReader.getProp("TypeScript", false);
     static private final boolean jakartaOutputDefault           = configReader.getProp("jakarta", true);  // use jakarta instead of javax
     static private final boolean defaultExternalizeDefault      = configReader.getProp("Externalize", false);
     static private final boolean defaultHazelcastDsDefault      = configReader.getProp("HazelcastDs", false);
@@ -60,6 +61,7 @@ public class BonScriptPreferences {
     public boolean doDebugOut               = doDebugOutDefault;
     public boolean doDateTime               = doDateTimeDefault;
     public boolean noXML                    = noXmlDefault;
+    public boolean doTypeScript             = doTypeScriptDefault;
     public boolean jakartaOutput            = jakartaOutputDefault;
     public boolean defaultExternalize       = defaultExternalizeDefault;
     public boolean defaultHazelcastDs       = defaultHazelcastDsDefault;
@@ -100,5 +102,8 @@ public class BonScriptPreferences {
     }
     def public static getNoXML() {
         return currentPrefs.noXML
+    }
+    def public static getDoTypeScript() {
+        return currentPrefs.doTypeScript
     }
 }

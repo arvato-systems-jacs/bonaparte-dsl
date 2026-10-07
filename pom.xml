@@ -67,6 +67,7 @@
     <modules>
         <module>de.jpaw.bonaparte.dsl</module>
         <module>de.jpaw.bonaparte.dsl.ide</module>
+        <module>de.jpaw.bonaparte.dsl.tests</module>
         <module>de.jpaw.bonaparte.dsl.ui</module>
         <module>de.jpaw.bonaparte.dsl.target</module>
         <module>de.jpaw.bonaparte.dsl.feature</module>
