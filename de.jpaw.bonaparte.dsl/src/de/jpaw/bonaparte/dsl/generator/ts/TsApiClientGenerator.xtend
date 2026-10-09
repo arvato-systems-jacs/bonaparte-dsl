@@ -98,11 +98,15 @@ class TsApiClientGenerator {
             }
             val wireType = if (info.responseRef === null) "void" else renderType(info.responseRef)
             val resultType = resultType(info, wireType)
-            out.append("\n    ").append(methodName).append("(params: Omit<").append(info.request.name)
-                .append(", '@PQON'>")
+            val paramsType = if (hasPaging(info.pattern))
+                "Omit<" + info.request.name + ", '@PQON' | 'offset'> & { offset?: number }"
+            else
+                "Omit<" + info.request.name + ", '@PQON'>"
+            val paramsValue = if (hasPaging(info.pattern)) "{ ...params, offset: params.offset ?? 0 }" else "params"
+            out.append("\n    ").append(methodName).append("(params: ").append(paramsType)
                 .append("): Observable<").append(resultType).append("> {\n")
             out.append("        return this.rpc.call<").append(wireType).append(">(")
-                .append(info.request.name).append("PQON, params).pipe(map(")
+                .append(info.request.name).append("PQON, ").append(paramsValue).append(").pipe(map(")
                 .append(unwrapExpression(info)).append("));\n")
             out.append("    }\n")
             if (isCrud(info.pattern))
@@ -189,6 +193,12 @@ class TsApiClientGenerator {
                 || pattern == TsRequestClassifier.Pattern.CRUD_STRING
                 || pattern == TsRequestClassifier.Pattern.CRUD_COMPOSITE
                 || pattern == TsRequestClassifier.Pattern.CRUD_MODULE
+    }
+
+    def private static boolean hasPaging(TsRequestClassifier.Pattern pattern) {
+        pattern == TsRequestClassifier.Pattern.SEARCH
+                || pattern == TsRequestClassifier.Pattern.LEAN_SEARCH
+                || pattern == TsRequestClassifier.Pattern.RESOLVE_MANY
     }
 
     def private static ClassDefinition findDescription(ClassDefinition request, String packageName) {

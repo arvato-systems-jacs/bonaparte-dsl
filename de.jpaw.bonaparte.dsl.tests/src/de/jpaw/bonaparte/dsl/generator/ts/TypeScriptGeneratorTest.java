@@ -114,21 +114,22 @@ public class TypeScriptGeneratorTest {
         "    class ServiceResponse {}",
         "    class SearchResponse<DATA, TRACKING> extends ServiceResponse {}",
         "    class ReadAllResponse<DATA, TRACKING> extends SearchResponse<DATA, TRACKING> {}",
-        "    class SearchRequest<DATA, TRACKING> return ReadAllResponse<!DATA, !TRACKING> {}",
+        "    class SearchCriteria { required int limit; required int offset; }",
+        "    class SearchRequest<DATA, TRACKING> extends SearchCriteria return ReadAllResponse<!DATA, !TRACKING> {}",
         "    class ProductDTO {}",
         "    class FullTracking {}",
         "    class ProductSearchRequest extends SearchRequest<ProductDTO, FullTracking> {}",
         "    class ProductSearchExtendedRequest extends ProductSearchRequest {}",
         "    class LeanSearchResponse extends ServiceResponse {}",
         "    class Description {}",
-        "    class LeanSearchRequest extends ServiceResponse return LeanSearchResponse {}",
+        "    class LeanSearchRequest extends SearchCriteria return LeanSearchResponse {}",
         "    class PriceListLeanSearchRequest extends LeanSearchRequest {}",
         "    class RefResolverResponse extends ServiceResponse {}",
         "    class RefResolverRequest<REF> return RefResolverResponse {}",
         "    class ProductRef {}",
         "    class ProductResolverRequest extends RefResolverRequest<ProductRef> {}",
         "    class MassResolverResponse extends ServiceResponse {}",
-        "    class MassResolverRequest return MassResolverResponse {}",
+        "    class MassResolverRequest extends SearchCriteria return MassResolverResponse {}",
         "    class ProductMassResolverRequest extends MassResolverRequest {}",
         "}",
         "");
@@ -359,21 +360,22 @@ public class TypeScriptGeneratorTest {
         Map<String, CharSequence> files = generateApis(API_SOURCE);
         String api = norm(files.get(ROOT + "com/acme/api/ProductApi.ts"));
         assertTrue(api, api.contains("export class ProductApi {"));
-        assertTrue(api, api.contains("search(params: Omit<ProductSearchRequest, '@PQON'>): Observable<ProductDTO[]>"));
-        assertTrue(api, api.contains("searchExtended(params: Omit<ProductSearchExtendedRequest, '@PQON'>): Observable<ProductDTO[]>"));
+        assertTrue(api, api.contains("search(params: Omit<ProductSearchRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<ProductDTO[]>"));
+        assertTrue(api, api.contains("searchExtended(params: Omit<ProductSearchExtendedRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<ProductDTO[]>"));
         assertTrue(api, api.contains(".pipe(map(unwrapSearch<ProductDTO>))"));
         assertTrue(api, api.contains("const ProductSearchRequestPQON = \"com.acme.api.ProductSearchRequest\";"));
-        assertTrue(api, api.contains("ProductSearchRequestPQON, params"));
+        assertTrue(api, api.contains("ProductSearchRequestPQON, { ...params, offset: params.offset ?? 0 }"));
         assertTrue(api, api.contains("const ProductSearchExtendedRequestPQON = \"com.acme.api.ProductSearchExtendedRequest\";"));
-        assertTrue(api, api.contains("ProductSearchExtendedRequestPQON, params"));
+        assertTrue(api, api.contains("ProductSearchExtendedRequestPQON, { ...params, offset: params.offset ?? 0 }"));
         assertTrue(api, !api.contains("unwrapLean"));
 
         String apiSource = String.join("\n",
             "package com.acme.api {",
             "    class ServiceResponse {}",
+            "    class SearchCriteria { required int limit; required int offset; }",
             "    class LeanSearchResponse extends ServiceResponse {}",
             "    class Description {}",
-            "    class LeanSearchRequest extends ServiceResponse return LeanSearchResponse {}",
+            "    class LeanSearchRequest extends SearchCriteria return LeanSearchResponse {}",
             "    class PriceListLeanSearchRequest extends LeanSearchRequest {}",
             "    class RefResolverResponse extends ServiceResponse {}",
             "    class RefResolverRequest<REF> return RefResolverResponse {}",
@@ -395,12 +397,14 @@ public class TypeScriptGeneratorTest {
             "    class ModuleConfigKey {}",
             "    class ProductCrudModuleCfgRequest extends CrudModuleCfgRequest<ProductDTO> {}",
             "    class MassResolverResponse extends ServiceResponse {}",
-            "    class MassResolverRequest return MassResolverResponse {}",
+            "    class MassResolverRequest extends SearchCriteria return MassResolverResponse {}",
             "    class ProductMassResolverRequest extends MassResolverRequest {}",
             "}",
             "");
         Map<String, CharSequence> otherFiles = generateApis(apiSource);
         String priceApi = norm(otherFiles.get(ROOT + "com/acme/api/PriceListApi.ts"));
+        assertTrue(priceApi, priceApi.contains("params: Omit<PriceListLeanSearchRequest, '@PQON' | 'offset'> & { offset?: number }"));
+        assertTrue(priceApi, priceApi.contains("PriceListLeanSearchRequestPQON, { ...params, offset: params.offset ?? 0 }"));
         assertTrue(priceApi, priceApi.contains("Observable<Description[]>"));
         assertTrue(priceApi, priceApi.contains("map(unwrapLean)"));
         String productApi = norm(otherFiles.get(ROOT + "com/acme/api/ProductApi.ts"));
@@ -425,7 +429,8 @@ public class TypeScriptGeneratorTest {
         assertTrue(productApi, productApi.contains("readUser(key: string,"));
         assertTrue(productApi, productApi.contains("readOrder(key: OrderKey,"));
         assertTrue(productApi, productApi.contains("readModuleCfg(key: ModuleConfigKey,"));
-        assertTrue(productApi, productApi.contains("resolveMany(params: Omit<ProductMassResolverRequest, '@PQON'>): Observable<number[]>"));
+        assertTrue(productApi, productApi.contains("resolveMany(params: Omit<ProductMassResolverRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<number[]>"));
+        assertTrue(productApi, productApi.contains("ProductMassResolverRequestPQON, { ...params, offset: params.offset ?? 0 }"));
         assertTrue(productApi, productApi.contains("map(unwrapResolveMany)"));
 
         String specialSource = String.join("\n",

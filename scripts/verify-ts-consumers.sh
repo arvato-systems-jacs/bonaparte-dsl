@@ -81,7 +81,9 @@ a28_api="$a28_root/a28-sku-api/src/generated/resources/ts/t9t/a28sku/request/Pro
 a28_mass_api="$a28_root/a28-sku-api/src/generated/resources/ts/t9t/a28sku/request/SkuApi.ts"
 takko_request="$takko_root/takko-api/src/generated/resources/ts/t9t/a28takko/StockProximitySearchRequest.ts"
 if [[ ! -f "$a28_api" ]] || ! grep -Fq 'create(data: ProductDTO,' "$a28_api" \
-    || ! grep -Fq 'resolve(params:' "$a28_api"; then
+    || ! grep -Fq 'resolve(params:' "$a28_api" \
+    || ! grep -Fq "Omit<ProductSearchRequest, '@PQON' | 'offset'> & { offset?: number }" "$a28_api" \
+    || ! grep -Fq 'ProductSearchRequestPQON, { ...params, offset: params.offset ?? 0 }' "$a28_api"; then
     printf 'Expected a28 generated API signatures were not found.\n' >&2
     exit 1
 fi
