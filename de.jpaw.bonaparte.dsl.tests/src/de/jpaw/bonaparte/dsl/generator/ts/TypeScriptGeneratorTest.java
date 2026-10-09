@@ -410,6 +410,9 @@ public class TypeScriptGeneratorTest {
         assertTrue(productApi, productApi.contains("import type { ProductRef } from \"./ProductRef\";"));
         assertTrue(productApi, productApi.contains("map(unwrapCrud<ProductDTO>)"));
         assertTrue(productApi, productApi.contains("create(data: ProductDTO,"));
+        assertTrue(productApi, productApi.contains("\n    create(data: ProductDTO,"));
+        assertTrue(productApi, productApi.contains("\n        return this.rpc.call<"));
+        assertTrue(productApi, !productApi.matches("(?s).*\\n[ \\t]+\\n.*"));
         assertTrue(productApi, productApi.contains("read(key: ProductRef,"));
         assertTrue(productApi, productApi.contains("update(key: ProductRef, data: Partial<ProductDTO>,"));
         assertTrue(productApi, productApi.contains("delete(key: ProductRef,"));
@@ -423,7 +426,7 @@ public class TypeScriptGeneratorTest {
         assertTrue(productApi, productApi.contains("readOrder(key: OrderKey,"));
         assertTrue(productApi, productApi.contains("readModuleCfg(key: ModuleConfigKey,"));
         assertTrue(productApi, productApi.contains("resolveMany(params: Omit<ProductMassResolverRequest, '@PQON'>): Observable<number[]>"));
-        assertTrue(productApi, productApi.contains("map(unwrapResolve)"));
+        assertTrue(productApi, productApi.contains("map(unwrapResolveMany)"));
 
         String specialSource = String.join("\n",
             "package com.acme.request {",

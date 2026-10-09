@@ -120,7 +120,7 @@ class TsApiClientGenerator {
         }
         val suffix = if (executeName.startsWith("execute")) executeName.substring("execute".length) else ""
         val wireType = if (info.responseRef === null) "void" else renderType(info.responseRef)
-        '''
+        val methods = '''
 
             «"create" + suffix»(data: «dto», extras: Partial<Omit<«info.request.name», '@PQON' | 'crud' | 'data' | 'onlyActive'>> = {}): Observable<«dto»> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapCrud<«dto»>));
@@ -138,6 +138,7 @@ class TsApiClientGenerator {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'D', onlyActive: false, key }).pipe(map(unwrapVoid));
             }
         '''
+        return methods.toString.replaceAll("\\n(?=[ \\t]*\\S)", "\n    ")
     }
 
     def private static void collectTypeImports(ClassReference ref, Map<String, EObject> imports) {
@@ -176,7 +177,7 @@ class TsApiClientGenerator {
             case SEARCH: "unwrapSearch<" + (info.dtoName ?: "unknown") + ">"
             case CRUD: "unwrapCrud<" + (info.dtoName ?: "unknown") + ">"
             case RESOLVE: "unwrapResolve"
-            case RESOLVE_MANY: "unwrapResolve"
+            case RESOLVE_MANY: "unwrapResolveMany"
             case LEAN_SEARCH: "unwrapLean"
             case SERVICE: "unwrapService<" + renderType(info.responseRef) + ">"
             case VOID: "unwrapVoid"
@@ -211,7 +212,7 @@ class TsApiClientGenerator {
             case SEARCH: "unwrapSearch"
             case CRUD: "unwrapCrud"
             case RESOLVE: "unwrapResolve"
-            case RESOLVE_MANY: "unwrapResolve"
+            case RESOLVE_MANY: "unwrapResolveMany"
             case LEAN_SEARCH: "unwrapLean"
             case SERVICE: "unwrapService"
             case VOID: "unwrapVoid"
