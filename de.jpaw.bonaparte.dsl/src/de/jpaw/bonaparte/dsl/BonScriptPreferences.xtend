@@ -44,6 +44,9 @@ public class BonScriptPreferences {
     static private final boolean doDateTimeDefault              = configReader.getProp("DateTime", true);
     static private final boolean noXmlDefault                   = configReader.getProp("noXML", false);
     static private final boolean doTypeScriptDefault            = configReader.getProp("TypeScript", false);
+    static private final String tsModuleDefault                 = configReader.getProp("TypeScript.module", null);
+    static private final String tsModulesFileDefault            = configReader.getProp("TypeScript.modulesFile", null);
+    static private final String tsBigLongsDefault               = configReader.getProp("TypeScript.bigLongs", null);
     static private final boolean jakartaOutputDefault           = configReader.getProp("jakarta", true);  // use jakarta instead of javax
     static private final boolean defaultExternalizeDefault      = configReader.getProp("Externalize", false);
     static private final boolean defaultHazelcastDsDefault      = configReader.getProp("HazelcastDs", false);
@@ -62,6 +65,9 @@ public class BonScriptPreferences {
     public boolean doDateTime               = doDateTimeDefault;
     public boolean noXML                    = noXmlDefault;
     public boolean doTypeScript             = doTypeScriptDefault;
+    public String tsModule                  = tsModuleDefault;
+    public String tsModulesFile             = tsModulesFileDefault;
+    public String tsBigLongs                = tsBigLongsDefault;
     public boolean jakartaOutput            = jakartaOutputDefault;
     public boolean defaultExternalize       = defaultExternalizeDefault;
     public boolean defaultHazelcastDs       = defaultHazelcastDsDefault;
@@ -105,5 +111,14 @@ public class BonScriptPreferences {
     }
     def public static getDoTypeScript() {
         return currentPrefs.doTypeScript
+    }
+    def public static getTsModule() {
+        return currentPrefs.tsModule
+    }
+    def public static getTsModulesFile() {
+        return currentPrefs.tsModulesFile
+    }
+    def public static getTsBigLongs() {
+        return currentPrefs.tsBigLongs
     }
 }

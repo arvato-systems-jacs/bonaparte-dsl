@@ -19,6 +19,7 @@ package de.jpaw.bonaparte.dsl.generator
 import de.jpaw.bonaparte.dsl.BonScriptPreferences
 import de.jpaw.bonaparte.dsl.generator.debug.DebugBonScriptGeneratorMain
 import de.jpaw.bonaparte.dsl.generator.java.JavaBonScriptGeneratorMain
+import de.jpaw.bonaparte.dsl.generator.ts.TsApiClientGenerator
 import de.jpaw.bonaparte.dsl.generator.ts.TypeScriptBonScriptGeneratorMain
 import de.jpaw.bonaparte.dsl.generator.xsd.XsdBonScriptGeneratorMain
 import java.util.concurrent.atomic.AtomicInteger
@@ -40,6 +41,7 @@ class BonScriptGenerator extends AbstractGenerator {
     @Inject JavaBonScriptGeneratorMain generatorJava
     @Inject XsdBonScriptGeneratorMain generatorXsd
     @Inject TypeScriptBonScriptGeneratorMain generatorTs
+    @Inject TsApiClientGenerator generatorTsApi
 
     def private String filterInfo() {
         "@" + localId + ": "
@@ -69,6 +71,7 @@ class BonScriptGenerator extends AbstractGenerator {
             if (BonScriptPreferences.getDoTypeScript) {
                 LOGGER.info(filterInfo + "start TypeScript creation for " + resource.URI.toString);
                 generatorTs.doGenerate(resource, fsa, unused)
+                generatorTsApi.doGenerate(resource, fsa)
             }
 
             LOGGER.info(filterInfo + "start cleanup");
