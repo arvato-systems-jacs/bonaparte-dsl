@@ -35,7 +35,17 @@ import static extension de.jpaw.bonaparte.dsl.generator.XUtil.*
 
 /** Generator which produces TypeScript type definitions (one file per class / enum / xenum).
  * It is only called if enabled in the preferences (-Dbonaparte.TypeScript=true).
- * The type mapping is conservative: whatever cannot be expressed exactly is mapped to "unknown".
+ *
+ * Wire-format rules (verified against a live bonaparte server):
+ * - Plain (non-alpha) enums are serialized as numeric ordinals
+ * - Alpha enums are serialized as their token strings
+ * - `instant` is serialized as epoch seconds (number)
+ * - `day`, `time`, `timestamp` are serialized as strings
+ * - `enumset` (numeric index) is serialized as an integer bitmap
+ * - `xenumset` is serialized as a string
+ * - Every object carries a `'@PQON'` field with the partially qualified object name
+ * - List elements may be null (fixed-size lists contain nulls)
+ * - Plain `Object` / `Element` map to `BonaPortable`
  */
 class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
     public static final String GENERATED_TS_SUBFOLDER = "resources/ts/"
@@ -96,23 +106,40 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         '''
     }
 
+    /** Deprecated marker for classes, enums, fields, packages. */
+    def private static CharSequence deprecatedMarker(EObject d) {
+        val isDep = if (d instanceof ClassDefinition) d.isDeprecated
+                    else if (d instanceof EnumDefinition) d.isDeprecated
+                    else if (d instanceof XEnumDefinition) d.isDeprecated
+                    else if (d instanceof FieldDefinition) d.isDeprecated
+                    else false
+        if (isDep)
+            return "/** @deprecated */\n"
+        return ""
+    }
+
     def private static CharSequence writeEnum(EnumDefinition d) {
         val alpha = JavaEnum.isAlphaEnum(d)
         '''
             «GENERATED_COMMENT»
 
             «d.javadoc.jsdoc»
-            export enum «d.name» {
-                «IF alpha»
+            «d.deprecatedMarker»
+            «IF alpha»
+                export const «d.name» = {
                     «FOR v : d.avalues SEPARATOR ","»
-                        «v.name» = "«v.token»"
+                        «v.name»: "«v.token»"
                     «ENDFOR»
-                «ELSE»
+                } as const;
+                export type «d.name» = (typeof «d.name»)[keyof typeof «d.name»];
+            «ELSE»
+                export const «d.name» = {
                     «FOR v : d.values SEPARATOR ","»
-                        «v» = "«v»"
+                        «v»: «d.values.indexOf(v)»
                     «ENDFOR»
-                «ENDIF»
-            }
+                } as const;
+                export type «d.name» = (typeof «d.name»)[keyof typeof «d.name»];
+            «ENDIF»
         '''
     }
 
@@ -121,6 +148,7 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
             «GENERATED_COMMENT»
 
             «d.javadoc.jsdoc»
+            «d.deprecatedMarker»
             export type «d.name» = string;
         '''
     }
@@ -132,14 +160,17 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         val body = '''
             «FOR f : d.fields»
                 «f.javadoc.jsdoc»
+                «f.deprecatedMarker»
                 «f.name»«IF !f.cannotBeNull»?«ENDIF»: «f.tsFieldType(d, refs)»;
             «ENDFOR»
+            '@PQON': string;
         '''
         return '''
             «GENERATED_COMMENT»
             «d.writeImports(refs)»
 
             «d.javadoc.jsdoc»
+            «d.deprecatedMarker»
             export interface «d.name»«generics»«parent» {
                 «body»
             }
@@ -149,9 +180,12 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
     /** Type of a field, including aggregate and null handling. */
     def private static String tsFieldType(FieldDefinition f, ClassDefinition owner, Map<String, EObject> refs) {
         val base = f.datatype.tsBaseType(owner, refs)
-        // an optional field may contain null at runtime
-        val elem = if (!f.cannotBeNull && f.isAggregateScalar) base + " | null" else base
-        if (f.isArray !== null || f.isList !== null || f.isSet !== null)
+        val isCollection = f.isArray !== null || f.isList !== null || f.isSet !== null
+        // list elements may be null (fixed-size lists contain nulls);
+        // an optional scalar field may contain null at runtime
+        val elem = if (isCollection) base + " | null"
+                   else if (!f.cannotBeNull && f.isAggregateScalar) base + " | null" else base
+        if (isCollection)
             return (if (elem.contains(" ")) "(" + elem + ")" else elem) + "[]"
         if (f.isMap !== null)
             return "Record<string, " + elem + ">"
@@ -165,12 +199,12 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
 
     def private static String tsClassRef(ClassReference r, EObject from, Map<String, EObject> refs) {
         if (r.plainObject)
-            return "unknown"
+            return "BonaPortable"
         if (r.genericsParameterRef !== null)
             return r.genericsParameterRef.name
         val cls = r.classRef
         if (cls === null)
-            return "unknown"
+            return "BonaPortable"
         refs.put(cls.name, cls)
         if (r.classRefGenericParms.empty)
             return cls.name
@@ -188,7 +222,7 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         }
         val elem = ref.elementaryDataType
         if (elem === null)
-            return "unknown"
+            return "BonaPortable"
         if (elem.enumType !== null) {
             refs.put(elem.enumType.name, elem.enumType)
             return elem.enumType.name
@@ -196,6 +230,16 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         if (elem.xenumType !== null) {
             refs.put(elem.xenumType.name, elem.xenumType)
             return elem.xenumType.name
+        }
+        if (elem.enumsetType !== null) {
+            // string index type -> string, numeric index type (or default) -> integer bitmap
+            val idx = elem.enumsetType.indexType
+            if (idx !== null && idx.toLowerCase.startsWith("s"))
+                return "string"
+            return "number"
+        }
+        if (elem.xenumsetType !== null) {
+            return "string"
         }
         switch (elem.name.toLowerCase) {
             case "boolean":
@@ -205,15 +249,19 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
                 "number"
             case "char", case "character", case "uuid", case "day",
             case "ascii", case "unicode", case "uppercase", case "lowercase",
-            case "instant", case "timestamp", case "time",
+            case "timestamp", case "time",
             case "raw", case "binary":
                 "string"
+            case "instant":
+                "number"
             case "json":
                 "Record<string, unknown>"
             case "array":
                 "unknown[]"
-            default:    // object, element, enumset, xenumset
-                "unknown"
+            case "object", case "element":
+                "BonaPortable"
+            default:
+                "BonaPortable"
         }
     }
 }

@@ -33,8 +33,14 @@ public class TypeScriptGeneratorTest {
         "    enum SortOrder { ASC, DESC }",
         "    enum Mode { A = \"a\", B = \"b\" }",
         "    xenum TimeUnit is Mode : 1;",
+        "    enumset<int> SortOrderSet is SortOrder;",
+        "    xenumset TimeUnitSet is TimeUnit;",
         "    class Base {",
         "        required long objectRef;",
+        "    }",
+        "    @Deprecated",
+        "    class Legacy {",
+        "        required long id;",
         "    }",
         "}",
         "package com.acme.auth {",
@@ -52,6 +58,11 @@ public class TypeScriptGeneratorTest {
         "        optional (com.acme.base.Base) other;",
         "        optional (!T) payload;",
         "        optional Json extra;",
+        "        optional enumset com.acme.base.SortOrderSet modes;",
+        "        optional xenumset com.acme.base.TimeUnitSet(10) units;",
+        "        optional Object blob;",
+        "        @Deprecated",
+        "        optional Integer oldAge;",
         "    }",
         "}",
         "");
@@ -90,14 +101,16 @@ public class TypeScriptGeneratorTest {
     @Test
     public void enumsAndXEnums() throws Exception {
         Map<String, CharSequence> files = generate(BON_SOURCE);
+        // plain enums are serialized as numeric ordinals
         String plain = norm(files.get(ROOT + "com/acme/base/SortOrder.ts"));
-        assertTrue(plain, plain.contains("export enum SortOrder {"));
-        assertTrue(plain, plain.contains("ASC = \"ASC\","));
-        assertTrue(plain, plain.contains("DESC = \"DESC\""));
+        assertTrue(plain, plain.contains("export const SortOrder = {"));
+        assertTrue(plain, plain.contains("ASC: 0,"));
+        assertTrue(plain, plain.contains("DESC: 1"));
+        assertTrue(plain, plain.contains("export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder];"));
         // alphanumeric enums use the token as value
         String alpha = norm(files.get(ROOT + "com/acme/base/Mode.ts"));
-        assertTrue(alpha, alpha.contains("A = \"a\","));
-        assertTrue(alpha, alpha.contains("B = \"b\""));
+        assertTrue(alpha, alpha.contains("A: \"a\","));
+        assertTrue(alpha, alpha.contains("B: \"b\""));
         assertTrue(norm(files.get(ROOT + "com/acme/base/TimeUnit.ts")).contains("export type TimeUnit = string;"));
     }
 
@@ -121,14 +134,36 @@ public class TypeScriptGeneratorTest {
         assertField(child, "nickname?: string | null;");         // optional scalar
         assertField(child, "active: boolean;");
         assertField(child, "age?: number | null;");
-        assertField(child, "created?: string | null;");          // instants are ISO strings
+        assertField(child, "created?: number | null;");          // instants are epoch seconds
         assertField(child, "order: SortOrder;");
         assertField(child, "unit?: TimeUnit | null;");
-        assertField(child, "tags: string[];");                   // required list
+        assertField(child, "tags: (string | null)[];");          // required list, elements may be null
         assertField(child, "labels?: Record<string, string>;");  // map
         assertField(child, "other?: Base | null;");
         assertField(child, "payload?: T | null;");               // generics parameter
         assertField(child, "extra?: Record<string, unknown> | null;");
+        assertField(child, "modes?: number | null;");            // numeric enumset -> integer bitmap
+        assertField(child, "units?: string | null;");            // xenumset -> string
+        assertField(child, "blob?: BonaPortable | null;");       // plain Object
+        assertField(child, "oldAge?: number | null;");           // deprecated field still generated
+    }
+
+    @Test
+    public void everyObjectHasPqonField() throws Exception {
+        Map<String, CharSequence> files = generate(BON_SOURCE);
+        for (String f : new String[] { "base/Base", "base/Legacy", "auth/Child" })
+            assertTrue(f, norm(files.get(ROOT + "com/acme/" + f + ".ts")).contains("'@PQON': string;"));
+    }
+
+    @Test
+    public void deprecatedTypesAndFieldsAreMarked() throws Exception {
+        Map<String, CharSequence> files = generate(BON_SOURCE);
+        String legacy = norm(files.get(ROOT + "com/acme/base/Legacy.ts"));
+        assertTrue(legacy, legacy.contains("/** @deprecated */"));
+        assertTrue(legacy, legacy.contains("export interface Legacy {"));
+        String child = norm(files.get(ROOT + "com/acme/auth/Child.ts"));
+        assertTrue(child, child.contains("/** @deprecated */"));
+        assertTrue(child, child.contains("oldAge?: number | null;"));
     }
 
     private static void assertField(String content, String line) {
