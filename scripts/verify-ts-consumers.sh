@@ -42,6 +42,7 @@ printf '%s\n' \
     'bonaparte-api-media=@arvato-systems-jacs/t9t-api,bonaparte-media' \
     'a28-base-api=@arvato-systems-jacs/a28-api,base' \
     'commerce-api=@arvato-systems-jacs/a28-api,commerce' \
+    'a28-sku-api=@arvato-systems-jacs/a28-api,sku' \
     > "$tmp_dir/a28-ts-modules.properties"
 
 printf '%s\n' \
@@ -61,6 +62,7 @@ printf '%s\n' \
     'a28-history-api=@arvato-systems-jacs/a28-api,history' \
     'a28-sku-api=@arvato-systems-jacs/a28-api,sku' \
     'a28-order-api=@arvato-systems-jacs/a28-api,order' \
+    'takko-api=@arvato-systems-jacs/takko-api,takko' \
     > "$tmp_dir/takko-ts-modules.properties"
 
 (cd "$dsl_root" && mvn -q install)
@@ -77,9 +79,11 @@ printf '%s\n' \
     -Dbonaparte.TypeScript.module=takko-api \
     "-Dbonaparte.TypeScript.modulesFile=$tmp_dir/takko-ts-modules.properties")
 
-a28_api="$a28_root/a28-sku-api/src/generated/resources/ts/t9t/a28sku/request/ProductApi.ts"
-a28_mass_api="$a28_root/a28-sku-api/src/generated/resources/ts/t9t/a28sku/request/SkuApi.ts"
-takko_request="$takko_root/takko-api/src/generated/resources/ts/t9t/a28takko/StockProximitySearchRequest.ts"
+a28_ts_root="$a28_root/a28-sku-api/src/generated/resources/ts/sku"
+takko_ts_root="$takko_root/takko-api/src/generated/resources/ts/takko"
+a28_api="$a28_ts_root/t9t/a28sku/request/ProductApi.ts"
+a28_mass_api="$a28_ts_root/t9t/a28sku/request/SkuApi.ts"
+takko_request="$takko_ts_root/t9t/a28takko/StockProximitySearchRequest.ts"
 if [[ ! -f "$a28_api" ]] || ! grep -Fq 'create(data: ProductDTO,' "$a28_api" \
     || ! grep -Fq 'resolve(params:' "$a28_api" \
     || ! grep -Fq "Omit<ProductSearchRequest, '@PQON' | 'offset'> & { offset?: number }" "$a28_api" \
@@ -101,7 +105,7 @@ if grep -Eq '^[[:blank:]]+$' "$a28_api"; then
     exit 1
 fi
 
-a28_count="$(find "$a28_root/a28-sku-api/src/generated/resources/ts" -type f -name '*.ts' | wc -l | tr -d '[:space:]')"
-takko_count="$(find "$takko_root/takko-api/src/generated/resources/ts" -type f -name '*.ts' | wc -l | tr -d '[:space:]')"
+a28_count="$(find "$a28_ts_root" -type f -name '*.ts' | wc -l | tr -d '[:space:]')"
+takko_count="$(find "$takko_ts_root" -type f -name '*.ts' | wc -l | tr -d '[:space:]')"
 printf 'Generation checks passed: a28-sku-api emitted %s TypeScript files; takko-api emitted %s.\n' "$a28_count" "$takko_count"
 printf 'This validates generation and module closure, not consumer TypeScript compilation; lower-layer npm entry points are not packaged yet.\n'

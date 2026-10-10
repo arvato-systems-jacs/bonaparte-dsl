@@ -45,6 +45,8 @@ public final class TsModuleResolver {
     }
 
     public static String crossModuleImport(EObject from, EObject target) {
+        if (from.eResource() == null || target.eResource() == null)
+            return null;
         String currentModule = moduleId(from.eResource().getURI());
         String targetModule = moduleId(target.eResource().getURI());
         if (currentModule == null || targetModule == null || currentModule.equals(targetModule))
@@ -63,11 +65,33 @@ public final class TsModuleResolver {
     }
 
     public static String importSpecifier(String artifactId, Properties modules) {
+        String[] mapping = moduleMapping(artifactId, modules);
+        return mapping[0] + "/" + mapping[1];
+    }
+
+    public static String currentEntryPoint() {
+        String currentModule = BonScriptPreferences.getTsModule();
+        String modulesFile = BonScriptPreferences.getTsModulesFile();
+        if (currentModule == null || currentModule.isBlank() || modulesFile == null || modulesFile.isBlank())
+            return null;
+        return entryPoint(currentModule, loadModules(modulesFile));
+    }
+
+    public static String outputFolder() {
+        String entryPoint = currentEntryPoint();
+        return entryPoint == null ? "resources/ts/" : "resources/ts/" + entryPoint + "/";
+    }
+
+    public static String entryPoint(String artifactId, Properties modules) {
+        return moduleMapping(artifactId, modules)[1];
+    }
+
+    private static String[] moduleMapping(String artifactId, Properties modules) {
         String[] mapping = modules.getProperty(artifactId, "").split(MODULES_PROPERTY_SEPARATOR, 2);
         if (mapping.length != 2 || mapping[0].isBlank() || mapping[1].isBlank())
-            throw new IllegalStateException("Invalid TypeScript module mapping for " + artifactId
+            throw new IllegalStateException("Invalid or missing TypeScript module mapping for " + artifactId
                     + ": expected <npm-package>,<entry-point>");
-        return mapping[0].trim() + "/" + mapping[1].trim();
+        return new String[] { mapping[0].trim(), mapping[1].trim() };
     }
 
     private static Properties loadModules(String path) {

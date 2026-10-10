@@ -277,6 +277,41 @@ public class TypeScriptGeneratorTest {
         modules.setProperty("t9t-base-api", "@arvato-systems-jacs/t9t-api,base");
         assertEquals("@arvato-systems-jacs/t9t-api/base",
             TsModuleResolver.importSpecifier("t9t-base-api", modules));
+        assertEquals("base", TsModuleResolver.entryPoint("t9t-base-api", modules));
+    }
+
+    @Test
+    public void generatesNgPackagrSecondaryEntryPoint() throws Exception {
+        Path modulesFile = Files.createTempFile("ts-modules", ".properties");
+        Files.writeString(modulesFile, "fixture-api=@arvato-systems-jacs/t9t-api,auth\n");
+        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
+        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
+        BonScriptPreferences.currentPrefs.tsModule = "fixture-api";
+        BonScriptPreferences.currentPrefs.tsModulesFile = modulesFile.toString();
+        try {
+            XtextResource resource = parse(BON_SOURCE);
+            InMemoryFileSystemAccess fsa = new InMemoryFileSystemAccess();
+            injector.getInstance(TypeScriptBonScriptGeneratorMain.class)
+                .doGenerate(resource, fsa, new GeneratorContext());
+
+            Map<String, CharSequence> files = fsa.getTextFiles();
+            String entryRoot = ROOT + "auth/";
+            assertTrue(norm(files.get(entryRoot + "package.json")).contains("\"entryFile\": \"index.ts\""));
+            assertTrue(norm(files.get(entryRoot + "ng-package.json")).contains("\"entryFile\": \"index.ts\""));
+            String index = norm(files.get(entryRoot + "index.ts"));
+            assertTrue(index, index.contains("export { ChildPQON }"));
+            assertTrue(index, index.contains("export type { Child }"));
+
+            InMemoryFileSystemAccess apiFsa = new InMemoryFileSystemAccess();
+            injector.getInstance(TsApiClientGenerator.class).doGenerate(parse(API_SOURCE), apiFsa);
+            String apiIndex = norm(apiFsa.getTextFiles().get(entryRoot + "api-index.ts"));
+            assertTrue(apiIndex, apiIndex.contains("export { ProductApi }"));
+        } finally {
+            BonScriptPreferences.currentPrefs.tsModule = previousModule;
+            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
+            Files.deleteIfExists(modulesFile);
+            DataTypeExtension.clear();
+        }
     }
 
     @Test

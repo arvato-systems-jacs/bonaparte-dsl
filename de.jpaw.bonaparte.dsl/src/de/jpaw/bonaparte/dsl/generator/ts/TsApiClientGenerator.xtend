@@ -41,10 +41,32 @@ class TsApiClientGenerator {
             val first = group.head.request
             val apiClass = TsNaming.apiClassName(first.package.name, group.head.dtoName,
                 group.head.request.name, group.head.pattern, namingOverrides)
-            fsa.generateFile(TypeScriptBonScriptGeneratorMain.GENERATED_TS_SUBFOLDER
+                fsa.generateFile(TsModuleResolver.outputFolder
                     + first.package.name.replace('.', '/') + "/" + apiClass + ".ts",
                 writeApi(first.package.name, apiClass, group, namingOverrides))
         }
+        if (TsModuleResolver.currentEntryPoint !== null)
+            fsa.generateFile(TsModuleResolver.outputFolder + "api-index.ts",
+                writeApiIndex(groups.values, namingOverrides))
+    }
+
+    def private static CharSequence writeApiIndex(Iterable<List<TsRequestClassifier.RequestInfo>> groups,
+            java.util.Properties namingOverrides) {
+        val exports = new LinkedHashSet<String>
+        for (group : groups) {
+            val first = group.head.request
+            val apiClass = TsNaming.apiClassName(first.package.name, group.head.dtoName,
+                first.name, group.head.pattern, namingOverrides)
+            val modulePath = "./" + first.package.name.replace('.', '/') + "/" + apiClass
+            exports.add("export { " + apiClass + " } from '" + modulePath + "';")
+            for (info : group.filter[hasNamedExtras(it)])
+                exports.add("export type { " + extrasTypeName(info) + " } from '" + modulePath + "';")
+        }
+        val out = new StringBuilder
+        out.append(TypeScriptBonScriptGeneratorMain.GENERATED_COMMENT).append("\n\n")
+        for (entry : exports)
+            out.append(entry).append("\n")
+        out
     }
 
     def private static CharSequence writeApi(String packageName, String apiClass,
@@ -338,6 +360,8 @@ class TsApiClientGenerator {
         val depth = packageName.split("\\.").length
         val path = new StringBuilder
         for (i : 0 ..< depth)
+            path.append("../")
+        if (TsModuleResolver.currentEntryPoint !== null)
             path.append("../")
         path.append("rpc-core/rpc-client")
         return path.toString
