@@ -359,6 +359,75 @@ public class TypeScriptGeneratorTest {
     }
 
     @Test
+    public void generatesApisForA28RequestExamples() throws Exception {
+        String source = String.join("\n",
+            "package t9t.a28coupon.request {",
+            "    class ServiceResponse {}",
+            "    class SearchCriteria { required int limit; required int offset; }",
+            "    class SearchResponse<DATA, TRACKING> extends ServiceResponse {}",
+            "    class ReadAllResponse<DATA, TRACKING> extends SearchResponse<DATA, TRACKING> {}",
+            "    class SearchRequest<DATA, TRACKING> extends SearchCriteria return ReadAllResponse<!DATA, !TRACKING> {}",
+            "    class LeanSearchResponse extends ServiceResponse {}",
+            "    class Description {}",
+            "    class LeanSearchRequest extends SearchCriteria return LeanSearchResponse {}",
+            "    class RefResolverResponse extends ServiceResponse {}",
+            "    class RefResolverRequest<REF> return RefResolverResponse {}",
+            "    class CrudAnyKeyResponse<DATA, TRACKING> extends ServiceResponse {}",
+            "    class CrudSurrogateResponse<DATA, TRACKING> extends CrudAnyKeyResponse<DATA, TRACKING> {}",
+            "    class CrudSurrogateKeyRequest<REF, DATA, TRACKING> return CrudSurrogateResponse<!DATA, !TRACKING> {}",
+            "    class RequestParameters return ServiceResponse {}",
+            "    abstract class AbstractCouponRequest extends RequestParameters { required unicode(20) couponId; }",
+            "    class ReserveCouponRequest extends AbstractCouponRequest {}",
+            "    class SalesOrderDTO {}",
+            "    class FullTracking {}",
+            "    class SalesOrderSearchRequest extends SearchRequest<SalesOrderDTO, FullTracking> {}",
+            "    class SalesOrderExtendedSearchRequest extends SalesOrderSearchRequest return ReadAllResponse<SalesOrderDTO, FullTracking> { optional unicode(20) customerId; }",
+            "    class LoyaltyCardDTO {}",
+            "    class LoyaltyCardSearchRequest extends SearchRequest<LoyaltyCardDTO, FullTracking> {}",
+            "    class LoyaltyCardSearchAndEnrichmentResponse extends ReadAllResponse<LoyaltyCardDTO, FullTracking> {}",
+            "    class LoyaltyCardSearchAndEnrichmentRequest extends SearchRequest<LoyaltyCardDTO, FullTracking> return LoyaltyCardSearchAndEnrichmentResponse {}",
+            "    class ProductDTO {}",
+            "    class ProductRef {}",
+            "    class ProductCrudRequest extends CrudSurrogateKeyRequest<ProductRef, ProductDTO, FullTracking> {}",
+            "    class ProductCrudViaApiRequest extends CrudSurrogateKeyRequest<ProductRef, ProductDTO, FullTracking> {}",
+            "    class ProductResolverRequest extends RefResolverRequest<ProductRef> {}",
+            "    class StockDTO {}",
+            "    class SearchFilter {}",
+            "    class StockSearchRequest extends SearchRequest<StockDTO, FullTracking> { optional (SearchFilter...) skuFilter; }",
+            "    class PriceListLeanSearchRequest extends LeanSearchRequest {}",
+            "}",
+            "");
+        Map<String, CharSequence> files = generateApis(source);
+
+        String couponApi = norm(files.get(ROOT + "t9t/a28coupon/request/A28couponApi.ts"));
+        assertTrue(couponApi, couponApi.contains("reserveCoupon(params: Omit<ReserveCouponRequest, '@PQON'>): Observable<void>"));
+        assertTrue(couponApi, couponApi.contains("map(unwrapVoid)"));
+
+        String salesOrderApi = norm(files.get(ROOT + "t9t/a28coupon/request/SalesOrderApi.ts"));
+        assertTrue(salesOrderApi, salesOrderApi.contains("export interface SalesOrderExtendedSearchRequestExtras extends Pick<SalesOrderExtendedSearchRequest, 'customerId'> {}"));
+        assertTrue(salesOrderApi, salesOrderApi.contains("searchExtended(params: Omit<SalesOrderExtendedSearchRequest, '@PQON' | 'offset' | 'customerId'> & { offset?: number } & SalesOrderExtendedSearchRequestExtras): Observable<SalesOrderDTO[]>"));
+        assertTrue(salesOrderApi, salesOrderApi.contains("map(unwrapSearch<SalesOrderDTO>)"));
+
+        String loyaltyCardApi = norm(files.get(ROOT + "t9t/a28coupon/request/LoyaltyCardApi.ts"));
+        assertTrue(loyaltyCardApi, loyaltyCardApi.contains("searchAndEnrichment(params: Omit<LoyaltyCardSearchAndEnrichmentRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<LoyaltyCardDTO[]>"));
+        assertTrue(loyaltyCardApi, loyaltyCardApi.contains("map(unwrapSearch<LoyaltyCardDTO>)"));
+
+        String productApi = norm(files.get(ROOT + "t9t/a28coupon/request/ProductApi.ts"));
+        assertTrue(productApi, productApi.contains("executeViaApi(params: Omit<ProductCrudViaApiRequest, '@PQON'>): Observable<ProductDTO>"));
+        assertTrue(productApi, productApi.contains("createViaApi(data: ProductDTO,"));
+        assertTrue(productApi, productApi.contains("resolve(params: Omit<ProductResolverRequest, '@PQON'>): Observable<number>"));
+        assertTrue(productApi, productApi.contains("map(unwrapResolve)"));
+
+        String stockApi = norm(files.get(ROOT + "t9t/a28coupon/request/StockApi.ts"));
+        assertTrue(stockApi, stockApi.contains("export interface StockSearchRequestExtras extends Pick<StockSearchRequest, 'skuFilter'> {}"));
+        assertTrue(stockApi, stockApi.contains("search(params: Omit<StockSearchRequest, '@PQON' | 'offset' | 'skuFilter'> & { offset?: number } & StockSearchRequestExtras)"));
+
+        String priceListApi = norm(files.get(ROOT + "t9t/a28coupon/request/PriceListApi.ts"));
+        assertTrue(priceListApi, priceListApi.contains("leanSearch(params: Omit<PriceListLeanSearchRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<Description[]>"));
+        assertTrue(priceListApi, priceListApi.contains("map(unwrapLean)"));
+    }
+
+    @Test
     public void appliesApiNamingOverrides() throws Exception {
         Path namingFile = Files.createTempFile("ts-api-naming", ".properties");
         String previousNamingFile = BonScriptPreferences.currentPrefs.tsApiNamingFile;
