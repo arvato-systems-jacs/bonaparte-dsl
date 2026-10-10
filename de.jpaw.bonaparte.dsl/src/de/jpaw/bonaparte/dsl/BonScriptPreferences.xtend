@@ -46,6 +46,7 @@ public class BonScriptPreferences {
     static private final boolean doTypeScriptDefault            = configReader.getProp("TypeScript", false);
     static private final String tsModuleDefault                 = configReader.getProp("TypeScript.module", null);
     static private final String tsModulesFileDefault            = configReader.getProp("TypeScript.modulesFile", null);
+    static private final String tsNpmPackageDefault              = configReader.getProp("TypeScript.npmPackage", null);
     static private final String tsBigLongsDefault               = configReader.getProp("TypeScript.bigLongs", null);
     static private final String tsApiNamingFileDefault           = configReader.getProp("TypeScript.apiNamingFile", null);
     static private final boolean jakartaOutputDefault           = configReader.getProp("jakarta", true);  // use jakarta instead of javax
@@ -68,6 +69,7 @@ public class BonScriptPreferences {
     public boolean doTypeScript             = doTypeScriptDefault;
     public String tsModule                  = tsModuleDefault;
     public String tsModulesFile             = tsModulesFileDefault;
+    public String tsNpmPackage              = tsNpmPackageDefault;
     public String tsBigLongs                = tsBigLongsDefault;
     public String tsApiNamingFile           = tsApiNamingFileDefault;
     public boolean jakartaOutput            = jakartaOutputDefault;
@@ -112,13 +114,19 @@ public class BonScriptPreferences {
         return currentPrefs.noXML
     }
     def public static getDoTypeScript() {
-        return currentPrefs.doTypeScript
+        return configReader.getProp("TypeScript", currentPrefs.doTypeScript)
     }
     def public static getTsModule() {
-        return currentPrefs.tsModule
+        return configReader.getProp("TypeScript.module", currentPrefs.tsModule)
     }
     def public static getTsModulesFile() {
-        return currentPrefs.tsModulesFile
+        return configReader.getProp("TypeScript.modulesFile", currentPrefs.tsModulesFile)
+    }
+    def public static getTsNpmPackage() {
+        return configReader.getProp("TypeScript.npmPackage", currentPrefs.tsNpmPackage)
+    }
+    def public static getTsIncludedModules() {
+        return configReader.getProp("TypeScript.includedModules", null)
     }
     def public static getTsBigLongs() {
         return currentPrefs.tsBigLongs

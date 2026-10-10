@@ -37,6 +37,26 @@ public final class TsModuleResolver {
         return leftModule == null || rightModule == null || leftModule.equals(rightModule);
     }
 
+    public static boolean isSameModule(Resource left, Resource right) {
+        String leftModule = moduleId(left.getURI());
+        String rightModule = moduleId(right.getURI());
+        if (leftModule == null || rightModule == null)
+            return isCurrentModule(left) && isCurrentModule(right);
+        return leftModule.equals(rightModule);
+    }
+
+    public static boolean isIncludedModule(Resource resource) {
+        String resourceModule = moduleId(resource.getURI());
+        String includedModules = BonScriptPreferences.getTsIncludedModules();
+        if (resourceModule == null || includedModules == null || includedModules.isBlank())
+            return false;
+        for (String module : includedModules.split(MODULES_PROPERTY_SEPARATOR)) {
+            if (resourceModule.equals(module.trim()))
+                return true;
+        }
+        return false;
+    }
+
     public static String typeGuard(String typeName, String pqon) {
         return "export function is" + typeName + "(value: unknown): value is " + typeName + " {\n"
                 + "    return typeof value === \"object\" && value !== null && (value as Record<string, unknown>)[\"@PQON\"] === \""
@@ -53,9 +73,13 @@ public final class TsModuleResolver {
             return null;
 
         String modulesFile = BonScriptPreferences.getTsModulesFile();
-        if (modulesFile == null || modulesFile.isBlank())
+        if (modulesFile == null || modulesFile.isBlank()) {
+            String npmPackage = BonScriptPreferences.getTsNpmPackage();
+            if (npmPackage != null && !npmPackage.isBlank())
+                return npmPackage + "/" + targetModule;
             throw new IllegalStateException("Cross-module TypeScript import from " + currentModule + " to "
                     + targetModule + " requires bonaparte.TypeScript.modulesFile");
+        }
 
         Properties modules = loadModules(modulesFile);
         if (!modules.containsKey(targetModule))
@@ -72,14 +96,33 @@ public final class TsModuleResolver {
     public static String currentEntryPoint() {
         String currentModule = BonScriptPreferences.getTsModule();
         String modulesFile = BonScriptPreferences.getTsModulesFile();
-        if (currentModule == null || currentModule.isBlank() || modulesFile == null || modulesFile.isBlank())
+        if (currentModule == null || currentModule.isBlank())
             return null;
+        if (modulesFile == null || modulesFile.isBlank())
+            return BonScriptPreferences.getTsNpmPackage() == null ? null : currentModule;
         return entryPoint(currentModule, loadModules(modulesFile));
     }
 
     public static String outputFolder() {
         String entryPoint = currentEntryPoint();
         return entryPoint == null ? "resources/ts/" : "resources/ts/" + entryPoint + "/";
+    }
+
+    public static String outputFolder(Resource resource) {
+        String artifactId = moduleId(resource.getURI());
+        if (artifactId == null)
+            return outputFolder();
+        String modulesFile = BonScriptPreferences.getTsModulesFile();
+        String entryPoint = modulesFile == null || modulesFile.isBlank()
+                ? artifactId : entryPoint(artifactId, loadModules(modulesFile));
+        return "resources/ts/" + entryPoint + "/";
+    }
+
+    public static boolean isModule(Resource resource, String artifactId) {
+        String resourceModule = moduleId(resource.getURI());
+        if (artifactId == null)
+            return resourceModule == null && isCurrentModule(resource);
+        return artifactId.equals(resourceModule);
     }
 
     public static String entryPoint(String artifactId, Properties modules) {
@@ -104,7 +147,7 @@ public final class TsModuleResolver {
         return modules;
     }
 
-    private static String moduleId(URI uri) {
+    public static String moduleId(URI uri) {
         String value = uri.toString();
         if (value.startsWith("jar:") || value.startsWith("archive:"))
             return moduleIdFromJar(value);

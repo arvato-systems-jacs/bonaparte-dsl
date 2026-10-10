@@ -1,5 +1,6 @@
 package de.jpaw.bonaparte.dsl.generator.ts
 
+import de.jpaw.bonaparte.dsl.BonScriptPreferences
 import de.jpaw.bonaparte.dsl.bonScript.ClassDefinition
 import de.jpaw.bonaparte.dsl.bonScript.ClassReference
 import java.util.ArrayList
@@ -52,21 +53,44 @@ class TsApiClientGenerator {
 
     def private static CharSequence writeApiIndex(Iterable<List<TsRequestClassifier.RequestInfo>> groups,
             java.util.Properties namingOverrides) {
-        val exports = new LinkedHashSet<String>
+        val exports = new LinkedHashMap<String, String>
         for (group : groups) {
             val first = group.head.request
             val apiClass = TsNaming.apiClassName(first.package.name, group.head.dtoName,
                 first.name, group.head.pattern, namingOverrides)
             val modulePath = "./" + first.package.name.replace('.', '/') + "/" + apiClass
-            exports.add("export { " + apiClass + " } from '" + modulePath + "';")
-            for (info : group.filter[hasNamedExtras(it)])
-                exports.add("export type { " + extrasTypeName(info) + " } from '" + modulePath + "';")
+            val publicApiName = uniqueExportName(apiClass, first.package.name, exports)
+            val apiSpecifier = if (publicApiName == apiClass) apiClass else apiClass + " as " + publicApiName
+            exports.put(publicApiName, "export { " + apiSpecifier + " } from '" + modulePath + "';")
+            for (info : group.filter[hasNamedExtras(it)]) {
+                val extrasName = extrasTypeName(info)
+                val publicExtrasName = uniqueExportName(extrasName, first.package.name, exports)
+                val extrasSpecifier = if (publicExtrasName == extrasName) extrasName else extrasName + " as " + publicExtrasName
+                exports.put(publicExtrasName, "export type { " + extrasSpecifier + " } from '" + modulePath + "';")
+            }
         }
         val out = new StringBuilder
         out.append(TypeScriptBonScriptGeneratorMain.GENERATED_COMMENT).append("\n\n")
-        for (entry : exports)
+        if (groups.empty)
+            out.append("export {};\n")
+        for (entry : exports.values)
             out.append(entry).append("\n")
         out
+    }
+
+    def private static String uniqueExportName(String name, String packageName, Map<String, String> exports) {
+        if (!exports.containsKey(name))
+            return name
+        val qualifier = packageName.split("\\.").filter[!equals("t9t") && !equals("api")]
+            .map[capitalize(it)].join
+        val simpleName = if (name.startsWith("Api")) name.substring(3) else name
+        var candidate = (if (qualifier.empty) "Generated" else qualifier) + simpleName
+        var suffix = 2
+        while (exports.containsKey(candidate)) {
+            candidate = (if (qualifier.empty) "Generated" else qualifier) + simpleName + suffix
+            suffix++
+        }
+        candidate
     }
 
     def private static CharSequence writeApi(String packageName, String apiClass,
@@ -89,6 +113,7 @@ class TsApiClientGenerator {
         out.append(TypeScriptBonScriptGeneratorMain.GENERATED_COMMENT).append("\n\n")
         out.append("import { inject, Injectable } from '@angular/core';\n")
         out.append("import { Observable, map } from 'rxjs';\n")
+        out.append("import type { BonaPortable } from '").append(bonaPortablePath(packageName)).append("';\n")
         out.append("import { RpcClient } from '").append(rpcClientPath(packageName)).append("';\n")
         val unwraps = new LinkedHashSet<String>
         for (info : requests) {
@@ -357,6 +382,9 @@ class TsApiClientGenerator {
     }
 
     def private static String rpcClientPath(String packageName) {
+        val npmPackage = BonScriptPreferences.getTsNpmPackage
+        if (npmPackage !== null && !npmPackage.blank)
+            return npmPackage
         val depth = packageName.split("\\.").length
         val path = new StringBuilder
         for (i : 0 ..< depth)
@@ -368,7 +396,14 @@ class TsApiClientGenerator {
     }
 
     def private static String rpcSupportPath(String packageName) {
+        val npmPackage = BonScriptPreferences.getTsNpmPackage
+        if (npmPackage !== null && !npmPackage.blank)
+            return npmPackage
         rpcClientPath(packageName).replace("rpc-client", "unwrap")
+    }
+
+    def private static String bonaPortablePath(String packageName) {
+        rpcClientPath(packageName).replace("rpc-client", "bona-portable")
     }
 
     def private static String capitalize(String name) {

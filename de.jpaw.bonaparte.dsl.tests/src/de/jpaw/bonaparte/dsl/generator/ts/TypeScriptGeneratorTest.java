@@ -281,6 +281,53 @@ public class TypeScriptGeneratorTest {
     }
 
     @Test
+    public void bonScriptTypeScriptSettingsReadSystemPropertiesDynamically() {
+        String previousTypeScript = System.getProperty("bonaparte.TypeScript");
+        String previousModule = System.getProperty("bonaparte.TypeScript.module");
+        String previousModulesFile = System.getProperty("bonaparte.TypeScript.modulesFile");
+        String previousNpmPackage = System.getProperty("bonaparte.TypeScript.npmPackage");
+        try {
+            System.setProperty("bonaparte.TypeScript", "true");
+            System.setProperty("bonaparte.TypeScript.module", "fixture-api");
+            System.setProperty("bonaparte.TypeScript.modulesFile", "fixture-modules.properties");
+            System.setProperty("bonaparte.TypeScript.npmPackage", "@arvato-systems-jacs/t9t-api");
+            assertTrue(BonScriptPreferences.getDoTypeScript());
+            assertEquals("fixture-api", BonScriptPreferences.getTsModule());
+            assertEquals("fixture-modules.properties", BonScriptPreferences.getTsModulesFile());
+            assertEquals("@arvato-systems-jacs/t9t-api", BonScriptPreferences.getTsNpmPackage());
+        } finally {
+            restoreSystemProperty("bonaparte.TypeScript", previousTypeScript);
+            restoreSystemProperty("bonaparte.TypeScript.module", previousModule);
+            restoreSystemProperty("bonaparte.TypeScript.modulesFile", previousModulesFile);
+            restoreSystemProperty("bonaparte.TypeScript.npmPackage", previousNpmPackage);
+        }
+    }
+
+    @Test
+    public void configuredNpmPackageProvidesDefaultSecondaryEntrypoint() {
+        String previousModule = System.getProperty("bonaparte.TypeScript.module");
+        String previousModulesFile = System.getProperty("bonaparte.TypeScript.modulesFile");
+        String previousNpmPackage = System.getProperty("bonaparte.TypeScript.npmPackage");
+        try {
+            System.setProperty("bonaparte.TypeScript.module", "t9t-base-api");
+            System.clearProperty("bonaparte.TypeScript.modulesFile");
+            System.setProperty("bonaparte.TypeScript.npmPackage", "@arvato-systems-jacs/t9t-api");
+            assertEquals("t9t-base-api", TsModuleResolver.currentEntryPoint());
+        } finally {
+            restoreSystemProperty("bonaparte.TypeScript.module", previousModule);
+            restoreSystemProperty("bonaparte.TypeScript.modulesFile", previousModulesFile);
+            restoreSystemProperty("bonaparte.TypeScript.npmPackage", previousNpmPackage);
+        }
+    }
+
+    private static void restoreSystemProperty(String key, String value) {
+        if (value == null)
+            System.clearProperty(key);
+        else
+            System.setProperty(key, value);
+    }
+
+    @Test
     public void generatesNgPackagrSecondaryEntryPoint() throws Exception {
         Path modulesFile = Files.createTempFile("ts-modules", ".properties");
         Files.writeString(modulesFile, "fixture-api=@arvato-systems-jacs/t9t-api,auth\n");
@@ -310,6 +357,32 @@ public class TypeScriptGeneratorTest {
             BonScriptPreferences.currentPrefs.tsModule = previousModule;
             BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
             Files.deleteIfExists(modulesFile);
+            DataTypeExtension.clear();
+        }
+    }
+
+    @Test
+    public void apiServicesImportRuntimeSupportFromPrimaryPackage() throws Exception {
+        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
+        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
+        String previousNpmPackage = BonScriptPreferences.currentPrefs.tsNpmPackage;
+        BonScriptPreferences.currentPrefs.tsModule = "fixture-api";
+        BonScriptPreferences.currentPrefs.tsModulesFile = null;
+        BonScriptPreferences.currentPrefs.tsNpmPackage = "@fixture/t9t-api";
+        try {
+            InMemoryFileSystemAccess fsa = new InMemoryFileSystemAccess();
+            injector.getInstance(TsApiClientGenerator.class).doGenerate(parse(API_SOURCE), fsa);
+            String api = fsa.getTextFiles().values().stream()
+                .map(TypeScriptGeneratorTest::norm)
+                .filter(content -> content.contains("export class ProductApi"))
+                .findFirst().orElseThrow();
+            assertTrue(api, api.contains("import type { BonaPortable } from '@fixture/t9t-api';"));
+            assertTrue(api, api.contains("import { RpcClient } from '@fixture/t9t-api';"));
+            assertTrue(api, api.contains("} from '@fixture/t9t-api';"));
+        } finally {
+            BonScriptPreferences.currentPrefs.tsModule = previousModule;
+            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
+            BonScriptPreferences.currentPrefs.tsNpmPackage = previousNpmPackage;
             DataTypeExtension.clear();
         }
     }

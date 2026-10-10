@@ -16,6 +16,7 @@
 
 package de.jpaw.bonaparte.dsl.generator.ts
 
+import de.jpaw.bonaparte.dsl.BonScriptPreferences
 import de.jpaw.bonaparte.dsl.bonScript.ClassDefinition
 import de.jpaw.bonaparte.dsl.bonScript.ClassReference
 import de.jpaw.bonaparte.dsl.bonScript.EnumDefinition
@@ -54,16 +55,20 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
 
     override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext unused) {
         if (TsModuleResolver.isCurrentModule(resource)) {
-            for (e : resource.allContents.toIterable.filter(typeof(EnumDefinition)))
-                fsa.generateFile(e.tsFilename(e.name), e.writeEnum)
-            for (e : resource.allContents.toIterable.filter(typeof(XEnumDefinition)))
-                fsa.generateFile(e.tsFilename(e.name), e.writeXEnum)
-            for (c : resource.allContents.toIterable.filter(typeof(ClassDefinition)))
-                fsa.generateFile(c.tsFilename(c.name), c.writeInterface)
-            if (TsModuleResolver.currentEntryPoint !== null) {
-                fsa.generateFile(TsModuleResolver.outputFolder + "package.json", entryPointPackageJson)
-                fsa.generateFile(TsModuleResolver.outputFolder + "ng-package.json", entryPointNgPackageJson)
-                fsa.generateFile(TsModuleResolver.outputFolder + "index.ts", writeModuleIndex(resource.resourceSet.resources))
+            val modules = resource.resourceSet.resources.filter[
+                TsModuleResolver.isCurrentModule(it) || TsModuleResolver.isIncludedModule(it)].toList
+            for (source : modules) {
+                for (e : source.allContents.toIterable.filter(typeof(EnumDefinition)))
+                    fsa.generateFile(e.tsFilename(e.name), e.writeEnum)
+                for (e : source.allContents.toIterable.filter(typeof(XEnumDefinition)))
+                    fsa.generateFile(e.tsFilename(e.name), e.writeXEnum)
+                for (c : source.allContents.toIterable.filter(typeof(ClassDefinition)))
+                    fsa.generateFile(c.tsFilename(c.name), c.writeInterface)
+                val folder = TsModuleResolver.outputFolder(source)
+                fsa.generateFile(folder + "package.json", entryPointPackageJson)
+                fsa.generateFile(folder + "ng-package.json", entryPointNgPackageJson)
+                fsa.generateFile(folder + "index.ts", writeModuleIndex(modules, source))
+                fsa.generateFile(folder + "api-index.ts", GENERATED_COMMENT + "\nexport {};\n")
             }
         }
     }
@@ -89,23 +94,30 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
                 '''
         }
 
-    def private static CharSequence writeModuleIndex(Iterable<Resource> resources) {
+    def private static CharSequence writeModuleIndex(Iterable<Resource> resources, Resource module) {
         val out = new StringBuilder
+        val exportedNames = new java.util.LinkedHashSet<String>
         out.append(GENERATED_COMMENT).append("\n\n")
-        for (source : resources.filter[TsModuleResolver.isCurrentModule(it)]) {
-            for (e : source.allContents.toIterable.filter(typeof(EnumDefinition)))
-                out.append("export { ").append(e.name).append(" } from './")
-                    .append(e.packagePath).append("/").append(e.name).append("';\n")
-            for (e : source.allContents.toIterable.filter(typeof(XEnumDefinition)))
-                out.append("export type { ").append(e.name).append(" } from './")
-                    .append(e.packagePath).append("/").append(e.name).append("';\n")
+        for (source : resources.filter[TsModuleResolver.isSameModule(it, module)]) {
+            for (e : source.allContents.toIterable.filter(typeof(EnumDefinition))) {
+                if (exportedNames.add(e.name))
+                    out.append("export { ").append(e.name).append(" } from './")
+                        .append(e.packagePath).append("/").append(e.name).append("';\n")
+            }
+            for (e : source.allContents.toIterable.filter(typeof(XEnumDefinition))) {
+                if (exportedNames.add(e.name))
+                    out.append("export type { ").append(e.name).append(" } from './")
+                        .append(e.packagePath).append("/").append(e.name).append("';\n")
+            }
             for (c : source.allContents.toIterable.filter(typeof(ClassDefinition))) {
-                val modulePath = "./" + c.packagePath + "/" + c.name
-                out.append("export { ").append(c.name).append("PQON } from '").append(modulePath).append("';\n")
-                out.append("export type { ").append(c.name).append(" } from '").append(modulePath).append("';\n")
-                if (c.extendsClass !== null && c.extendsClass.classRef !== null
-                        && !TsModuleResolver.isSameModule(c, c.extendsClass.classRef))
-                    out.append("export { is").append(c.name).append(" } from '").append(modulePath).append("';\n")
+                if (exportedNames.add(c.name)) {
+                    val modulePath = "./" + c.packagePath + "/" + c.name
+                    out.append("export { ").append(c.name).append("PQON } from '").append(modulePath).append("';\n")
+                    out.append("export type { ").append(c.name).append(" } from '").append(modulePath).append("';\n")
+                    if (c.extendsClass !== null && c.extendsClass.classRef !== null
+                            && !TsModuleResolver.isSameModule(c, c.extendsClass.classRef))
+                        out.append("export { is").append(c.name).append(" } from '").append(modulePath).append("';\n")
+                }
             }
         }
         out.append("export * from './api-index';\n")
@@ -116,8 +128,19 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         d.package.name.replace('.', '/')
     }
 
+    def private static String bonaPortablePath(String packageName) {
+        val npmPackage = BonScriptPreferences.getTsNpmPackage
+        if (npmPackage !== null && !npmPackage.blank)
+            return npmPackage
+        val path = new StringBuilder
+        for (i : 0 ..< packageName.split("\\.").length)
+            path.append("../")
+        path.append("../rpc-core/bona-portable")
+        path.toString
+    }
+
     def private static String tsFilename(EObject d, String name) {
-        TsModuleResolver.outputFolder + d.packagePath + "/" + name + ".ts"
+        TsModuleResolver.outputFolder(d.eResource) + d.packagePath + "/" + name + ".ts"
     }
 
     /** Relative module specifier to import type "name" of the package of "target" into a file of the package of "from". */
@@ -143,11 +166,13 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
     }
 
     def private static CharSequence writeImports(EObject from, Map<String, EObject> refs) {
-        '''
-            «FOR r : refs.entrySet»
-                import type { «r.key» } from "«importPath(from, r.value, r.key)»";
-            «ENDFOR»
-        '''
+        val out = new StringBuilder
+        for (r : refs.entrySet) {
+            if (from !== r.value)
+                out.append("import type { ").append(r.key).append(" } from \"")
+                    .append(importPath(from, r.value, r.key)).append("\";\n")
+        }
+        out
     }
 
     def private static CharSequence jsdoc(String text) {
@@ -224,6 +249,7 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         '''
         return '''
             «GENERATED_COMMENT»
+            import type { BonaPortable } from "«bonaPortablePath(d.package.name)»";
             «d.writeImports(refs)»
 
             export const «d.name»PQON = "«pqon»" as const;
