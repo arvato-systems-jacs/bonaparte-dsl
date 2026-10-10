@@ -18,12 +18,14 @@ class TsApiClientGenerator {
         if (!TsModuleResolver.isCurrentModule(resource))
             return
 
+        val namingOverrides = TsNaming.loadOverrides
         val groups = new LinkedHashMap<String, List<TsRequestClassifier.RequestInfo>>
         for (source : resource.resourceSet.resources.filter[source | TsModuleResolver.isCurrentModule(source)]) {
             for (request : source.allContents.toIterable.filter(typeof(ClassDefinition))) {
                 val info = TsRequestClassifier.classify(request)
                 if (info !== null && info.pattern != TsRequestClassifier.Pattern.UNKNOWN) {
-                    val apiClass = TsNaming.apiClassName(request.package.name, info.dtoName, request.name, info.pattern)
+                    val apiClass = TsNaming.apiClassName(request.package.name, info.dtoName, request.name,
+                        info.pattern, namingOverrides)
                     val groupKey = request.package.name + "|" + apiClass
                     var requests = groups.get(groupKey)
                     if (requests === null) {
@@ -38,15 +40,15 @@ class TsApiClientGenerator {
         for (group : groups.values) {
             val first = group.head.request
             val apiClass = TsNaming.apiClassName(first.package.name, group.head.dtoName,
-                group.head.request.name, group.head.pattern)
+                group.head.request.name, group.head.pattern, namingOverrides)
             fsa.generateFile(TypeScriptBonScriptGeneratorMain.GENERATED_TS_SUBFOLDER
                     + first.package.name.replace('.', '/') + "/" + apiClass + ".ts",
-                writeApi(first.package.name, apiClass, group))
+                writeApi(first.package.name, apiClass, group, namingOverrides))
         }
     }
 
     def private static CharSequence writeApi(String packageName, String apiClass,
-            List<TsRequestClassifier.RequestInfo> requests) {
+            List<TsRequestClassifier.RequestInfo> requests, java.util.Properties namingOverrides) {
         val imports = new LinkedHashMap<String, EObject>
         for (info : requests) {
             imports.put(info.request.name, info.request)
@@ -54,6 +56,8 @@ class TsApiClientGenerator {
                 val refType = findType(info.request, info.refName)
                 if (refType !== null)
                     imports.put(refType.name, refType)
+                for (subclass : refSubclasses(info))
+                    imports.put(subclass.name, subclass)
             }
             if (info.responseRef !== null)
                 collectTypeImports(info.responseRef, imports)
@@ -81,6 +85,8 @@ class TsApiClientGenerator {
         for (entry : imports.entrySet)
             out.append("import type { ").append(entry.key).append(" } from \"")
                 .append(importPath(requests.head.request, packageName, entry.value, entry.key)).append("\";\n")
+        for (info : requests.filter[hasNamedExtras(it)])
+            out.append("\n").append(writeExtrasInterface(info))
         for (info : requests)
             out.append("\nconst ").append(info.request.name).append("PQON = \"")
                 .append(info.request.package.name).append(".").append(info.request.name).append("\";\n")
@@ -89,7 +95,7 @@ class TsApiClientGenerator {
         out.append("    private readonly rpc = inject(RpcClient);\n")
         val usedMethods = new LinkedHashSet<String>
         for (info : requests) {
-            var methodName = TsNaming.methodName(info.request.name, info.pattern, info.dtoName)
+            var methodName = TsNaming.methodName(info.request.name, info.pattern, info.dtoName, namingOverrides)
             if (isCrud(info.pattern))
                 methodName = "execute" + (if (methodName.startsWith("create")) methodName.substring(6) else "")
             if (!usedMethods.add(methodName)) {
@@ -98,10 +104,7 @@ class TsApiClientGenerator {
             }
             val wireType = if (info.responseRef === null) "void" else renderType(info.responseRef)
             val resultType = resultType(info, wireType)
-            val paramsType = if (hasPaging(info.pattern))
-                "Omit<" + info.request.name + ", '@PQON' | 'offset'> & { offset?: number }"
-            else
-                "Omit<" + info.request.name + ", '@PQON'>"
+            val paramsType = requestParameterType(info)
             val paramsValue = if (hasPaging(info.pattern)) "{ ...params, offset: params.offset ?? 0 }" else "params"
             out.append("\n    ").append(methodName).append("(params: ").append(paramsType)
                 .append("): Observable<").append(resultType).append("> {\n")
@@ -116,33 +119,112 @@ class TsApiClientGenerator {
         return out
     }
 
+    def private static String requestParameterType(TsRequestClassifier.RequestInfo info) {
+        val excluded = new ArrayList<String>
+        excluded.add("'@PQON'")
+        if (hasPaging(info.pattern))
+            excluded.add("'offset'")
+        if (hasNamedExtras(info))
+            for (field : info.request.fields)
+                excluded.add("'" + field.name + "'")
+        var result = "Omit<" + info.request.name + ", " + excluded.join(" | ") + ">"
+        if (hasPaging(info.pattern))
+            result += " & { offset?: number }"
+        if (hasNamedExtras(info))
+            result += " & " + extrasTypeName(info)
+        return result
+    }
+
+    def private static CharSequence writeExtrasInterface(TsRequestClassifier.RequestInfo info) {
+        "export interface " + extrasTypeName(info) + " extends Pick<" + info.request.name + ", "
+            + extraFieldNames(info) + "> {}\n"
+    }
+
+    def private static String extrasTypeName(TsRequestClassifier.RequestInfo info) {
+        info.request.name + "Extras"
+    }
+
+    def private static String extraFieldNames(TsRequestClassifier.RequestInfo info) {
+        info.request.fields.map["'" + name + "'"].join(" | ")
+    }
+
+    def private static boolean hasNamedExtras(TsRequestClassifier.RequestInfo info) {
+        !info.request.fields.empty && (isCrud(info.pattern) || hasPaging(info.pattern))
+    }
+
     def private static CharSequence writeCrudMethods(TsRequestClassifier.RequestInfo info, String executeName) {
         val dto = info.dtoName ?: "unknown"
         val ref = switch (info.pattern) {
             case CRUD_STRING: "string"
-            default: info.refName ?: "unknown"
+            default: refTypeUnion(info)
         }
         val suffix = if (executeName.startsWith("execute")) executeName.substring("execute".length) else ""
         val wireType = if (info.responseRef === null) "void" else renderType(info.responseRef)
+        val excluded = new ArrayList<String>
+        excluded.add("'@PQON'")
+        excluded.add("'crud'")
+        excluded.add("'data'")
+        excluded.add("'onlyActive'")
+        if (hasNamedExtras(info))
+            for (field : info.request.fields)
+                excluded.add("'" + field.name + "'")
+        val extrasType = "Partial<Omit<" + info.request.name + ", " + excluded.join(" | ") + ">>"
+            + (if (hasNamedExtras(info)) " & " + extrasTypeName(info) else "")
+        val extrasDefault = if (info.request.fields.exists[cannotBeNull]) "" else " = {}"
         val methods = '''
 
-            «"create" + suffix»(data: «dto», extras: Partial<Omit<«info.request.name», '@PQON' | 'crud' | 'data' | 'onlyActive'>> = {}): Observable<«dto»> {
+            «"create" + suffix»(data: «dto», extras: «extrasType»«extrasDefault»): Observable<«dto»> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapCrud<«dto»>));
             }
 
-            «"read" + suffix»(key: «ref», extras: Partial<Omit<«info.request.name», '@PQON' | 'crud' | 'data' | 'key' | 'onlyActive'>> = {}): Observable<«dto»> {
+            «"read" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<«dto»> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'R', onlyActive: false, key }).pipe(map(unwrapCrud<«dto»>));
             }
 
-            «"update" + suffix»(key: «ref», data: Partial<«dto»>, extras: Partial<Omit<«info.request.name», '@PQON' | 'crud' | 'data' | 'key' | 'onlyActive'>> = {}): Observable<«dto»> {
+            «"update" + suffix»(key: «ref», data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<«dto»> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, key, data }).pipe(map(unwrapCrud<«dto»>));
             }
 
-            «"delete" + suffix»(key: «ref», extras: Partial<Omit<«info.request.name», '@PQON' | 'crud' | 'data' | 'key' | 'onlyActive'>> = {}): Observable<void> {
+            «"delete" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'D', onlyActive: false, key }).pipe(map(unwrapVoid));
             }
         '''
         return methods.toString.replaceAll("\\n(?=[ \\t]*\\S)", "\n    ")
+    }
+
+    def private static String refTypeUnion(TsRequestClassifier.RequestInfo info) {
+        val refType = findType(info.request, info.refName)
+        if (refType === null)
+            return info.refName ?: "unknown"
+        val types = new LinkedHashSet<String>
+        types.add(refType.name)
+        for (subclass : refSubclasses(info))
+            types.add(subclass.name)
+        return types.join(" | ")
+    }
+
+    def private static List<ClassDefinition> refSubclasses(TsRequestClassifier.RequestInfo info) {
+        val refType = findType(info.request, info.refName)
+        if (refType === null)
+            return new ArrayList<ClassDefinition>
+        val subclasses = new ArrayList<ClassDefinition>
+        for (source : info.request.eResource.resourceSet.resources) {
+            for (candidate : source.allContents.toIterable.filter(typeof(ClassDefinition))) {
+                if (candidate !== refType && !candidate.isAbstract && extendsType(candidate, refType))
+                    subclasses.add(candidate)
+            }
+        }
+        return subclasses
+    }
+
+    def private static boolean extendsType(ClassDefinition candidate, ClassDefinition ancestor) {
+        var ClassDefinition current = candidate
+        while (current.extendsClass !== null && current.extendsClass.classRef !== null) {
+            current = current.extendsClass.classRef
+            if (current === ancestor)
+                return true
+        }
+        return false
     }
 
     def private static void collectTypeImports(ClassReference ref, Map<String, EObject> imports) {

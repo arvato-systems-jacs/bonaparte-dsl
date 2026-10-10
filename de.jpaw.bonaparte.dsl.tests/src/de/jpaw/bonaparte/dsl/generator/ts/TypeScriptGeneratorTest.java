@@ -7,6 +7,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
@@ -24,6 +26,7 @@ import org.junit.Test;
 import com.google.inject.Injector;
 
 import de.jpaw.bonaparte.dsl.BonScriptStandaloneSetup;
+import de.jpaw.bonaparte.dsl.BonScriptPreferences;
 import de.jpaw.bonaparte.dsl.bonScript.ClassDefinition;
 import de.jpaw.bonaparte.dsl.generator.DataTypeExtension;
 
@@ -118,7 +121,7 @@ public class TypeScriptGeneratorTest {
         "    class SearchRequest<DATA, TRACKING> extends SearchCriteria return ReadAllResponse<!DATA, !TRACKING> {}",
         "    class ProductDTO {}",
         "    class FullTracking {}",
-        "    class ProductSearchRequest extends SearchRequest<ProductDTO, FullTracking> {}",
+            "    class ProductSearchRequest extends SearchRequest<ProductDTO, FullTracking> { optional Unicode(20) customScope; }",
         "    class ProductSearchExtendedRequest extends ProductSearchRequest {}",
         "    class LeanSearchResponse extends ServiceResponse {}",
         "    class Description {}",
@@ -356,11 +359,29 @@ public class TypeScriptGeneratorTest {
     }
 
     @Test
+    public void appliesApiNamingOverrides() throws Exception {
+        Path namingFile = Files.createTempFile("ts-api-naming", ".properties");
+        String previousNamingFile = BonScriptPreferences.currentPrefs.tsApiNamingFile;
+        try {
+            Files.writeString(namingFile, "ProductSearchRequest.api=CatalogApi\nProductSearchRequest.method=findProducts\n");
+            BonScriptPreferences.currentPrefs.tsApiNamingFile = namingFile.toString();
+            Map<String, CharSequence> files = generateApis(API_SOURCE);
+            String api = norm(files.get(ROOT + "com/acme/api/CatalogApi.ts"));
+            assertTrue(api, api.contains("export class CatalogApi {"));
+            assertTrue(api, api.contains("findProducts(params: Omit<ProductSearchRequest, '@PQON' | 'offset' | 'customScope'>"));
+        } finally {
+            BonScriptPreferences.currentPrefs.tsApiNamingFile = previousNamingFile;
+            Files.deleteIfExists(namingFile);
+        }
+    }
+
+    @Test
     public void generatesGroupedTypedSearchApi() throws Exception {
         Map<String, CharSequence> files = generateApis(API_SOURCE);
         String api = norm(files.get(ROOT + "com/acme/api/ProductApi.ts"));
         assertTrue(api, api.contains("export class ProductApi {"));
-        assertTrue(api, api.contains("search(params: Omit<ProductSearchRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<ProductDTO[]>"));
+        assertTrue(api, api.contains("export interface ProductSearchRequestExtras extends Pick<ProductSearchRequest, 'customScope'> {}"));
+        assertTrue(api, api.contains("search(params: Omit<ProductSearchRequest, '@PQON' | 'offset' | 'customScope'> & { offset?: number } & ProductSearchRequestExtras): Observable<ProductDTO[]>"));
         assertTrue(api, api.contains("searchExtended(params: Omit<ProductSearchExtendedRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<ProductDTO[]>"));
         assertTrue(api, api.contains(".pipe(map(unwrapSearch<ProductDTO>))"));
         assertTrue(api, api.contains("const ProductSearchRequestPQON = \"com.acme.api.ProductSearchRequest\";"));
@@ -381,12 +402,13 @@ public class TypeScriptGeneratorTest {
             "    class RefResolverRequest<REF> return RefResolverResponse {}",
             "    class ProductDTO {}",
             "    class ProductRef {}",
+            "    class ProductNaturalRef extends ProductRef {}",
             "    class FullTracking {}",
             "    class ProductResolverRequest extends RefResolverRequest<ProductRef> {}",
             "    class CrudAnyKeyResponse<DATA, TRACKING> extends ServiceResponse {}",
             "    class CrudSurrogateResponse<DATA, TRACKING> extends CrudAnyKeyResponse<DATA, TRACKING> {}",
             "    class CrudSurrogateKeyRequest<REF, DATA, TRACKING> return CrudSurrogateResponse<!DATA, !TRACKING> {}",
-            "    class ProductCrudRequest extends CrudSurrogateKeyRequest<ProductRef, ProductDTO, FullTracking> {}",
+            "    class ProductCrudRequest extends CrudSurrogateKeyRequest<ProductRef, ProductDTO, FullTracking> { optional Unicode(20) source; }",
             "    class ProductCrudViaApiRequest extends CrudSurrogateKeyRequest<ProductRef, ProductDTO, FullTracking> {}",
             "    class CrudStringKeyRequest<DATA, TRACKING> return CrudAnyKeyResponse<!DATA, !TRACKING> {}",
             "    class UserCrudRequest extends CrudStringKeyRequest<ProductDTO, FullTracking> {}",
@@ -408,18 +430,20 @@ public class TypeScriptGeneratorTest {
         assertTrue(priceApi, priceApi.contains("Observable<Description[]>"));
         assertTrue(priceApi, priceApi.contains("map(unwrapLean)"));
         String productApi = norm(otherFiles.get(ROOT + "com/acme/api/ProductApi.ts"));
+        assertTrue(productApi, productApi.contains("export interface ProductCrudRequestExtras extends Pick<ProductCrudRequest, 'source'> {}"));
         assertTrue(productApi, productApi.contains("resolve(params: Omit<ProductResolverRequest, '@PQON'>): Observable<number>"));
         assertTrue(productApi, productApi.contains("map(unwrapResolve)"));
-        assertTrue(productApi, productApi.contains("execute(params: Omit<ProductCrudRequest, '@PQON'>): Observable<ProductDTO>"));
+        assertTrue(productApi, productApi.contains("execute(params: Omit<ProductCrudRequest, '@PQON' | 'source'> & ProductCrudRequestExtras): Observable<ProductDTO>"));
         assertTrue(productApi, productApi.contains("import type { ProductRef } from \"./ProductRef\";"));
         assertTrue(productApi, productApi.contains("map(unwrapCrud<ProductDTO>)"));
         assertTrue(productApi, productApi.contains("create(data: ProductDTO,"));
+        assertTrue(productApi, productApi.contains("extras: Partial<Omit<ProductCrudRequest, '@PQON' | 'crud' | 'data' | 'onlyActive' | 'source'>> & ProductCrudRequestExtras = {}"));
         assertTrue(productApi, productApi.contains("\n    create(data: ProductDTO,"));
         assertTrue(productApi, productApi.contains("\n        return this.rpc.call<"));
         assertTrue(productApi, !productApi.matches("(?s).*\\n[ \\t]+\\n.*"));
-        assertTrue(productApi, productApi.contains("read(key: ProductRef,"));
-        assertTrue(productApi, productApi.contains("update(key: ProductRef, data: Partial<ProductDTO>,"));
-        assertTrue(productApi, productApi.contains("delete(key: ProductRef,"));
+        assertTrue(productApi, productApi.contains("read(key: ProductRef | ProductNaturalRef,"));
+        assertTrue(productApi, productApi.contains("update(key: ProductRef | ProductNaturalRef, data: Partial<ProductDTO>,"));
+        assertTrue(productApi, productApi.contains("delete(key: ProductRef | ProductNaturalRef,"));
         assertTrue(productApi, productApi.contains("crud: 'C', onlyActive: false, data"));
         assertTrue(productApi, productApi.contains("crud: 'R', onlyActive: false, key"));
         assertTrue(productApi, productApi.contains("crud: 'U', onlyActive: false, key, data"));

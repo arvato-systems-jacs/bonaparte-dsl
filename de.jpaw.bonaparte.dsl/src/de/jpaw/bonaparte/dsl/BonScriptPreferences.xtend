@@ -47,6 +47,7 @@ public class BonScriptPreferences {
     static private final String tsModuleDefault                 = configReader.getProp("TypeScript.module", null);
     static private final String tsModulesFileDefault            = configReader.getProp("TypeScript.modulesFile", null);
     static private final String tsBigLongsDefault               = configReader.getProp("TypeScript.bigLongs", null);
+    static private final String tsApiNamingFileDefault           = configReader.getProp("TypeScript.apiNamingFile", null);
     static private final boolean jakartaOutputDefault           = configReader.getProp("jakarta", true);  // use jakarta instead of javax
     static private final boolean defaultExternalizeDefault      = configReader.getProp("Externalize", false);
     static private final boolean defaultHazelcastDsDefault      = configReader.getProp("HazelcastDs", false);
@@ -68,6 +69,7 @@ public class BonScriptPreferences {
     public String tsModule                  = tsModuleDefault;
     public String tsModulesFile             = tsModulesFileDefault;
     public String tsBigLongs                = tsBigLongsDefault;
+    public String tsApiNamingFile           = tsApiNamingFileDefault;
     public boolean jakartaOutput            = jakartaOutputDefault;
     public boolean defaultExternalize       = defaultExternalizeDefault;
     public boolean defaultHazelcastDs       = defaultHazelcastDsDefault;
@@ -120,5 +122,8 @@ public class BonScriptPreferences {
     }
     def public static getTsBigLongs() {
         return currentPrefs.tsBigLongs
+    }
+    def public static getTsApiNamingFile() {
+        return currentPrefs.tsApiNamingFile
     }
 }
