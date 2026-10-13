@@ -19,11 +19,11 @@ package de.jpaw.bonaparte.dsl.generator
 import de.jpaw.bonaparte.dsl.BonScriptPreferences
 import de.jpaw.bonaparte.dsl.generator.debug.DebugBonScriptGeneratorMain
 import de.jpaw.bonaparte.dsl.generator.java.JavaBonScriptGeneratorMain
-import de.jpaw.bonaparte.dsl.generator.tsapi.TsApiClientGenerator
 import de.jpaw.bonaparte.dsl.generator.ts.TypeScriptBonScriptGeneratorMain
+import de.jpaw.bonaparte.dsl.generator.tsapi.TsApiClientGenerator
 import de.jpaw.bonaparte.dsl.generator.xsd.XsdBonScriptGeneratorMain
-import java.util.concurrent.atomic.AtomicInteger
 import jakarta.inject.Inject
+import java.util.concurrent.atomic.AtomicInteger
 import org.apache.log4j.Logger
 import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
@@ -62,8 +62,8 @@ class BonScriptGenerator extends AbstractGenerator {
             }
 
             if (BonScriptPreferences.getDoJava) {
-	            LOGGER.info(filterInfo + "start code output: Java output for " + resAsString);
-	            generatorJava.doGenerate(resource, fsa, unused)
+                LOGGER.info(filterInfo + "start code output: Java output for " + resAsString);
+                generatorJava.doGenerate(resource, fsa, unused)
             }
 
             if (BonScriptPreferences.getDoXsd) {
