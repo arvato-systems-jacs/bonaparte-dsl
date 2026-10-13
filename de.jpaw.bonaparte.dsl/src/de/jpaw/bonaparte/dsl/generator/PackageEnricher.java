@@ -41,7 +41,7 @@ public class PackageEnricher implements IDerivedStateComputer {
         resource.getAllContents().forEachRemaining(object -> {
             if (object instanceof PackageDefinition pd) {
                 object.eAdapters().removeIf(a -> a instanceof ModuleInfo);
-                object.eAdapters().add(new ModuleInfo(mavenModule, resource.getURI().lastSegment(), pd.getName()));
+                object.eAdapters().add(new ModuleInfo(mavenModule));
                 LOGGER.info("Assigning maven module " + mavenModule + " to package " + pd.getName() + " in file " + resource.getURI().lastSegment());
             }
         });
