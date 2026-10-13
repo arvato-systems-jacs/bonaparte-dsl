@@ -677,4 +677,15 @@ class XUtil {
             case "Map": return "Hash"
         }
     }
+    def public static String getTypescriptPackage(EObject e) {
+        val PackageDefinition pd = getPackageOrNull(e);
+        if (pd !== null) {
+            for (a : pd.eAdapters()) {
+                if (a instanceof ModuleInfo) {
+                    return (a as ModuleInfo).getMavenModule()
+                }
+            }
+        }
+        return null
+    }
 }
