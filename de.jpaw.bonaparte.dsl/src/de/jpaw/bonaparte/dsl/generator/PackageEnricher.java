@@ -37,14 +37,27 @@ public class PackageEnricher implements IDerivedStateComputer {
     public void installDerivedState(DerivedStateAwareResource resource, boolean preLinkingPhase) {
 
         final String mavenModule = getMavenModuleName(resource);
-
-        resource.getAllContents().forEachRemaining(object -> {
-            if (object instanceof PackageDefinition pd) {
-                object.eAdapters().removeIf(a -> a instanceof ModuleInfo);
-                object.eAdapters().add(new ModuleInfo(mavenModule));
-                LOGGER.info("Assigning maven module " + mavenModule + " to package " + pd.getName() + " in file " + resource.getURI().lastSegment());
-            }
-        });
+        if (mavenModule == null) {
+            // check if there is existing info
+            resource.getAllContents().forEachRemaining(object -> {
+                if (object instanceof PackageDefinition pd) {
+                    for (var a : object.eAdapters()) {
+                        if (a instanceof ModuleInfo mi) {
+                            LOGGER.info("Existing maven module " + mi.getMavenModule() + " found for package " + pd.getName() + " in file " + resource.getURI().lastSegment());
+                        }
+                    }
+                }
+            });
+        } else {
+            // assign info
+            resource.getAllContents().forEachRemaining(object -> {
+                if (object instanceof PackageDefinition pd) {
+                    object.eAdapters().removeIf(a -> a instanceof ModuleInfo);
+                    object.eAdapters().add(new ModuleInfo(mavenModule));
+                    LOGGER.info("Assigning maven module " + mavenModule + " to package " + pd.getName() + " in file " + resource.getURI().lastSegment());
+                }
+            });
+        }
     }
 
     @Override
