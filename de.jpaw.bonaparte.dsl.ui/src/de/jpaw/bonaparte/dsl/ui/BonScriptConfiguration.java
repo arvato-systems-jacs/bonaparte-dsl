@@ -169,7 +169,7 @@ public class BonScriptConfiguration extends LanguageRootPreferencePage {
                   case "typeScriptDefault":
                       BonScriptPreferences.currentPrefs.doTypeScript        = toBool(event.getNewValue());
                       break;
-                  case "typeScriptDefaultApi":
+                  case "typeScriptApiDefault":
                       BonScriptPreferences.currentPrefs.doTypeScriptApi     = toBool(event.getNewValue());
                       break;
                   case "TypeScript.module":
