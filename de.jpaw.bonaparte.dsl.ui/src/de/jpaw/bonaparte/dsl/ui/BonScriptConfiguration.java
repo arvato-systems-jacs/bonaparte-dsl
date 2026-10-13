@@ -69,7 +69,7 @@ public class BonScriptConfiguration extends LanguageRootPreferencePage {
         Composite compositeO = new Composite(outputGroup, SWT.NONE);
         addField(new BooleanFieldEditor("JavaDefault", "Generate Java source code", compositeO));
         addField(new BooleanFieldEditor("DateTime", "Use JSR310 date / time API instead of joda (requires Java8)", compositeO));
-        addField(new BooleanFieldEditor("XMLOut", "Suppress generation of JAXB annotations", compositeO));
+        addField(new BooleanFieldEditor("XsdOut", "Generate XSDs and JAXB annotations", compositeO));
         addField(new BooleanFieldEditor("Jakarta", "Generate NEW jakarta package prefixes", compositeO));
 
         // Serialization support
