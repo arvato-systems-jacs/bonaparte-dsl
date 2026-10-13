@@ -12,23 +12,30 @@ public class PackageEnricher implements IDerivedStateComputer {
 
     private String getMavenModuleName(Resource resource) {
         final String uri = resource.getURI().toString();
-
-        // determine desired components out of URI (which could be like file:/Users/bisc02/src/jacs/t9t/t9t-base-api/src/main/bon/base/ui.bon)
-        // we parse the URI under the assumption that maven folder syntax is used
-        final int lastSlash = uri.lastIndexOf('/');
-        final String filename = lastSlash >= 0 ? uri.substring(lastSlash + 1) : null;
-        final int startOfPath = uri.indexOf("/src/main/");
         String mavenModule = null;
-        if (startOfPath > 0) {
-            final String modulePath = uri.substring(0, startOfPath);
-            final int endOfProjectPath = modulePath.lastIndexOf('/');
-            if (endOfProjectPath >= 0) {
-                mavenModule = modulePath.substring(endOfProjectPath + 1);
+
+        // first, distinguish between URIs inside a jar and outside a jar. Inside a JAR starts with archive:, and the subsequent parts need to be parsed differently.
+        if (uri.startsWith("archive:")) {
+            // inside a jar, a possible URI is of the form archive:file:/Users/bisc02/.m2/repository/de/jpaw/bonaparte-api/7.3.2/bonaparte-api-7.3.2.jar!/api.bon
+            // we strip off anything after the last !, and then use the part after the previous slash
+            final int lastExclamation = uri.lastIndexOf('!');
+            if (lastExclamation > 0) {
+                final int lastSlash = uri.lastIndexOf('/', lastExclamation);
+                final String jarName = uri.substring(lastSlash + 1, lastExclamation);
+                // use the start of jarName, until you encounter the first dash, which is followed by a digit
+                mavenModule = jarName.replaceFirst("-(?=\\d)[\\s\\S]*", "");
             }
-        }
-        if (filename == null || mavenModule == null) {
-            LOGGER.error("Could not determine project and file name from URI " + uri);
-            return null;  // no EObject enrichment will be done
+        } else {
+            // determine desired components out of URI (which could be like file:/Users/bisc02/src/jacs/t9t/t9t-base-api/src/main/bon/base/ui.bon)
+            // we parse the URI under the assumption that maven folder syntax is used
+            final int startOfPath = uri.indexOf("/src/main/");
+            if (startOfPath > 0) {
+                final String modulePath = uri.substring(0, startOfPath);
+                final int endOfProjectPath = modulePath.lastIndexOf('/');
+                if (endOfProjectPath >= 0) {
+                    mavenModule = modulePath.substring(endOfProjectPath + 1);
+                }
+            }
         }
         return mavenModule;
     }
