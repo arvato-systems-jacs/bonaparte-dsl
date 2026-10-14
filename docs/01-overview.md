@@ -127,7 +127,7 @@ There are two supported hosts:
 
 ## Versioning
 
-The project version is `6.6.3-SNAPSHOT`. The Eclipse update site is published at
+The project version is `7.0.0-SNAPSHOT`. The Eclipse update site is published at
 <https://arvato-systems-jacs.github.io/bonaparte-dsl/>.
 
 ## Where to go next
