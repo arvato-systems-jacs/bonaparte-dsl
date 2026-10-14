@@ -19,6 +19,9 @@ package de.jpaw.bonaparte.dsl.generator
 import de.jpaw.bonaparte.dsl.BonScriptPreferences
 import de.jpaw.bonaparte.dsl.generator.debug.DebugBonScriptGeneratorMain
 import de.jpaw.bonaparte.dsl.generator.java.JavaBonScriptGeneratorMain
+import de.jpaw.bonaparte.dsl.generator.tsapi.TsApiClientGenerator
+import de.jpaw.bonaparte.dsl.generator.ts.TypeScriptBonScriptGeneratorMain
+import de.jpaw.bonaparte.dsl.generator.ts.TsGenerationContext
 import de.jpaw.bonaparte.dsl.generator.xsd.XsdBonScriptGeneratorMain
 import java.util.concurrent.atomic.AtomicInteger
 import jakarta.inject.Inject
@@ -38,6 +41,9 @@ class BonScriptGenerator extends AbstractGenerator {
     @Inject DebugBonScriptGeneratorMain generatorDebug
     @Inject JavaBonScriptGeneratorMain generatorJava
     @Inject XsdBonScriptGeneratorMain generatorXsd
+    @Inject TypeScriptBonScriptGeneratorMain generatorTs
+    @Inject TsApiClientGenerator generatorTsApi
+    @com.google.inject.Inject(optional=true) TsGenerationContext ownershipContext
 
     def private String filterInfo() {
         "@" + localId + ": "
@@ -49,19 +55,33 @@ class BonScriptGenerator extends AbstractGenerator {
     }
 
     override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext unused) {
+        val resAsString = resource.URI.toString
+        if (ownershipContext !== null)
+            TsGenerationContext.attach(resource.resourceSet, ownershipContext)
 
         try {
             if (BonScriptPreferences.currentPrefs.doDebugOut) {
-                LOGGER.info(filterInfo + "start code output: Debug dump for " + resource.URI.toString);
+                LOGGER.info(filterInfo + "start code output: Debug dump for " + resAsString);
                 generatorDebug.doGenerate(resource, fsa)
             }
 
-            LOGGER.info(filterInfo + "start code output: Java output for " + resource.URI.toString);
-            generatorJava.doGenerate(resource, fsa, unused)
+            if (BonScriptPreferences.getDoJava) {
+	            LOGGER.info(filterInfo + "start code output: Java output for " + resAsString);
+	            generatorJava.doGenerate(resource, fsa, unused)
+            }
 
-            if (!BonScriptPreferences.getNoXML) {
-                LOGGER.info(filterInfo + "start XSD creation for " + resource.URI.toString);
+            if (BonScriptPreferences.getDoXsd) {
+                LOGGER.info(filterInfo + "start XSD creation for " + resAsString);
                 generatorXsd.doGenerate(resource, fsa, unused)
+            }
+
+            if (BonScriptPreferences.getDoTypeScript) {
+                LOGGER.info(filterInfo + "start TypeScript creation for " + resAsString);
+                generatorTs.doGenerate(resource, fsa, unused)
+            }
+            if (BonScriptPreferences.getDoTypeScriptApi) {
+                LOGGER.info(filterInfo + "start TypeScript API creation for " + resAsString);
+                generatorTsApi.doGenerate(resource, fsa)
             }
 
             LOGGER.info(filterInfo + "start cleanup");
