@@ -94,9 +94,7 @@ public class BonScriptConfiguration extends LanguageRootPreferencePage {
         Composite compositeTs = new Composite(tsGroup, SWT.NONE);
         addField(new BooleanFieldEditor("typeScriptDefault",           "Generate TypeScript files also if no explicit TypeScript directive set", compositeTs));
         addField(new BooleanFieldEditor("typeScriptApiDefault",        "Generate TypeScript API files also if no explicit TypeScriptApi directive set", compositeTs));
-        addField(new StringFieldEditor("TypeScript.module", "Module", compositeTs));
-        addField(new StringFieldEditor("TypeScript.modulesFile", "Modules file", compositeTs));
-        addField(new StringFieldEditor("TypeScript.npmPackage", "NPM package", compositeTs));
+        addField(new StringFieldEditor("TypeScript.runtimeImport", "Runtime package", compositeTs));
     }
 
     @Override
@@ -108,9 +106,7 @@ public class BonScriptConfiguration extends LanguageRootPreferencePage {
         store.setDefault("WarnFloat",           defaults.warnFloat);
         store.setDefault("typeScriptDefault",   defaults.doTypeScript);
         store.setDefault("typeScriptApiDefault",   defaults.doTypeScriptApi);
-        store.setDefault("TypeScript.module",   defaults.tsModule == null ? "" : defaults.tsModule);
-        store.setDefault("TypeScript.modulesFile", defaults.tsModulesFile == null ? "" : defaults.tsModulesFile);
-        store.setDefault("TypeScript.npmPackage", defaults.tsNpmPackage == null ? "" : defaults.tsNpmPackage);
+        store.setDefault("TypeScript.runtimeImport", defaults.tsRuntimeImport == null ? "" : defaults.tsRuntimeImport);
         store.setDefault("DebugOut",            defaults.doDebugOut);
         store.setDefault("DateTime",            defaults.doDateTime);
         store.setDefault("JavaOut",             defaults.doJava);
@@ -131,9 +127,7 @@ public class BonScriptConfiguration extends LanguageRootPreferencePage {
         currentSettings.warnFloat                   = store.getBoolean("WarnFloat");
         currentSettings.doTypeScript                = store.getBoolean("typeScriptDefault");
         currentSettings.doTypeScriptApi             = store.getBoolean("typeScriptApiDefault");
-        currentSettings.tsModule                    = store.getString("TypeScript.module");
-        currentSettings.tsModulesFile               = store.getString("TypeScript.modulesFile");
-        currentSettings.tsNpmPackage                = store.getString("TypeScript.npmPackage");
+        currentSettings.tsRuntimeImport             = store.getString("TypeScript.runtimeImport");
         currentSettings.doDebugOut                  = store.getBoolean("DebugOut");
         currentSettings.doDateTime                  = store.getBoolean("DateTime");
         currentSettings.doJava                      = store.getBoolean("JavaOut");
@@ -166,14 +160,8 @@ public class BonScriptConfiguration extends LanguageRootPreferencePage {
                   case "typeScriptDefaultApi":
                       BonScriptPreferences.currentPrefs.doTypeScriptApi     = toBool(event.getNewValue());
                       break;
-                  case "TypeScript.module":
-                      BonScriptPreferences.currentPrefs.tsModule            = (String) event.getNewValue();
-                      break;
-                  case "TypeScript.modulesFile":
-                      BonScriptPreferences.currentPrefs.tsModulesFile       = (String) event.getNewValue();
-                      break;
-                  case "TypeScript.npmPackage":
-                      BonScriptPreferences.currentPrefs.tsNpmPackage        = (String) event.getNewValue();
+                  case "TypeScript.runtimeImport":
+                      BonScriptPreferences.currentPrefs.tsRuntimeImport     = (String) event.getNewValue();
                       break;
                   case "DebugOut":
                       BonScriptPreferences.currentPrefs.doDebugOut          = toBool(event.getNewValue());

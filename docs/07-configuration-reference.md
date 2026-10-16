@@ -24,8 +24,8 @@ There is an important subtlety about *when* a setting is read:
 - **Dynamic settings** are re-read from the `ConfigReader` on every call, so environment variables
   (and system properties) apply at call time.
 
-The TypeScript-related getters (`getDoTypeScript`, `getDoTypeScriptApi`, `getTsModule`,
-`getTsModulesFile`, `getTsExternalModulesFile`, `getTsNpmPackage`, `getTsIncludedModules`) are
+The TypeScript-related getters (`getDoTypeScript`, `getDoTypeScriptApi`, `getTsIncludedModules`,
+`getTsRuntimeImport`, `getTsRpcImport`) are
 **dynamic**. This is what allows the Maven `properties-maven-plugin` to set `bonaparte.TypeScript`
 as a system property at `initialize` time and have it picked up later in the build (see
 [Maven Integration](06-maven-integration.md)).
@@ -42,10 +42,8 @@ as a system property at `initialize` time and have it picked up later in the bui
 | `doXsd` | boolean | `true` | static | Emit XSD/JAXB artifacts (annotations, `package-info`, `jaxb.index`). |
 | `TypeScript` | boolean | `false` | **dynamic** | Run the TypeScript model generator. |
 | `TypeScriptApi` | boolean | `false` | **dynamic** | Run the TypeScript API generator. |
-| `TypeScript.module` | string | `null` | **dynamic** | The module id this build produces (Eclipse). |
-| `TypeScript.modulesFile` | string | `null` | **dynamic** | Properties file `<artifactId>=<npm-package>,<entry-point>`. |
-| `TypeScript.externalModulesFile` | string | `null` | **dynamic** | Properties file for modules not in the reactor. |
-| `TypeScript.npmPackage` | string | `null` | **dynamic** | Fallback npm package scope. |
+| `TypeScript.runtimeImport` | string | `@arvato-systems-jacs/bonaparte-typescript` | **dynamic** | Package root imported for `BonaPortable` and metadata runtime types. The DSL does not generate these runtime files. |
+| `TypeScript.rpcImport` | string | `null` | **dynamic** | npm import specifier for `RpcClient` and unwrap helpers. Unset or blank: use relative `ts/rpc-core` imports. |
 | `TypeScript.includedModules` | string | `null` | **dynamic** | Comma list of additional modules to generate. |
 | `jakarta` | boolean | `true` | static | Use `jakarta.*` (`true`) vs `javax.*` (`false`) XML namespace. |
 | `Externalize` | boolean | `false` | static | Default `Externalizable` when not set per class/package. |

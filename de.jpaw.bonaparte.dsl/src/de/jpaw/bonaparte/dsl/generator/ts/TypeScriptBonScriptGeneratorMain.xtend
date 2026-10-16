@@ -83,27 +83,12 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
                 for (c : source.allContents.toIterable.filter(typeof(ClassDefinition)))
                     fsa.generateFile(c.tsFilename(c.name), c.writeInterface)
                 val folder = TsModuleResolver.outputFolder(source)
-                if (TsModuleResolver.generatesPortableSupport(source)) {
-                    fsa.generateFile(folder + "bona-portable.ts", bonaPortableSource)
-                    fsa.generateFile(folder + TsMetaRuntimeSource.MODULE_NAME + ".ts",
-                        GENERATED_COMMENT + "\n\n" + TsMetaRuntimeSource.source)
-                }
                 fsa.generateFile(folder + "package.json", entryPointPackageJson)
                 fsa.generateFile(folder + "ng-package.json", entryPointNgPackageJson)
                 fsa.generateFile(folder + "index.ts", writeModuleIndex(modules, source))
                 fsa.generateFile(folder + "api-index.ts", GENERATED_COMMENT + "\nexport {};\n")
             }
         }
-    }
-
-    def private static CharSequence bonaPortableSource() {
-        '''
-        «GENERATED_COMMENT»
-        export interface BonaPortable {
-            '@PQON': string;
-            [key: string]: unknown;
-        }
-        '''
     }
 
     def private static CharSequence entryPointPackageJson() {
@@ -131,13 +116,6 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         val out = new StringBuilder
         val typesByIdentity = new LinkedHashMap<String, EObject>
         out.append(GENERATED_COMMENT).append("\n\n")
-        if (TsModuleResolver.generatesPortableSupport(module)) {
-            out.append("export type { BonaPortable } from './bona-portable';\n")
-            out.append("export type { BonaProps, TsFieldMeta, TsClassMeta, BonValidationRule, BonValidationIssue }"
-                + " from './" + TsMetaRuntimeSource.MODULE_NAME + "';\n")
-            out.append("export { bonAllFields, bonClassProp, bonValidate } from './"
-                + TsMetaRuntimeSource.MODULE_NAME + "';\n")
-        }
         for (source : resources.filter[TsModuleResolver.isSameModule(it, module)]) {
             for (type : source.allContents.toIterable.filter(typeof(EnumDefinition)))
                 typesByIdentity.putIfAbsent(TsImportCollector.bonIdentity(type), type)
@@ -338,7 +316,7 @@ class TypeScriptBonScriptGeneratorMain extends AbstractGenerator {
         return '''
             «GENERATED_COMMENT»
             import type { BonaPortable } from "«TsModuleResolver.runtimeSupportImport(d, d.name, "bona-portable")»";
-            import type { TsClassMeta } from "«TsModuleResolver.runtimeSupportImport(d, d.name, TsMetaRuntimeSource.MODULE_NAME)»";
+            import type { TsClassMeta } from "«TsModuleResolver.runtimeSupportImport(d, d.name, "bona-meta")»";
             «d.writeImports(d.name, refs)»
             «d.writeMetaImports(d.name, metaRefs)»
 
