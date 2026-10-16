@@ -2,6 +2,7 @@ package de.jpaw.bonaparte.maven;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.jar.JarFile;
 
@@ -35,11 +36,17 @@ public final class TypeScriptGenerateMojo extends XtextGenerateMojo {
     private ProjectBuilder projectBuilder;
     @Component
     private RepositorySystem repositorySystem;
+    @Parameter
+    private String includedModules;
+    @Parameter
+    private String npmPackageModules;
 
     @Override
     protected void internalExecute() throws MojoExecutionException {
         try {
             MavenProject current = getProject();
+            if ("pom".equals(current.getPackaging()))
+                return;
             TsGenerationContext.Owner currentOwner = owner(current);
             List<TsGenerationContext.Location> locations = new ArrayList<>();
             addProjectLocations(locations, current, currentOwner);
@@ -55,10 +62,12 @@ public final class TypeScriptGenerateMojo extends XtextGenerateMojo {
                         addArchiveLocation(locations, file, dependencyOwner);
                 } else if (file.isFile() && file.getName().endsWith(".jar") && containsBon(file)) {
                     MavenProject dependency = effectiveModel(artifact);
-                    addArchiveLocation(locations, file, owner(dependency));
+                    String packageOwner = belongsToCurrentPackage(artifact.getArtifactId())
+                        ? currentOwner.npmPackage() : null;
+                    addArchiveLocation(locations, file, owner(dependency, packageOwner));
                 }
             }
-            TsGenerationContext context = new TsGenerationContext(currentOwner, locations);
+            TsGenerationContext context = new TsGenerationContext(currentOwner, locations, includedModules());
             for (var language : getLanguages()) {
                 if (BonScriptStandaloneSetup.class.getName().equals(language.getSetup()))
                     language.setSetup(BonScriptMavenSetup.class.getName());
@@ -94,10 +103,33 @@ public final class TypeScriptGenerateMojo extends XtextGenerateMojo {
     }
 
     private static TsGenerationContext.Owner owner(MavenProject project) {
+        return owner(project, null);
+    }
+
+    private static TsGenerationContext.Owner owner(MavenProject project, String fallbackNpmPackage) {
         String npmPackage = project.getProperties().getProperty("npm.package");
+        if ((npmPackage == null || npmPackage.isBlank()) && fallbackNpmPackage != null && !fallbackNpmPackage.isBlank())
+            npmPackage = fallbackNpmPackage;
         if (npmPackage == null || npmPackage.isBlank())
             throw new IllegalStateException("Missing inherited npm.package for " + project.getId());
         return new TsGenerationContext.Owner(project.getGroupId(), project.getArtifactId(), project.getVersion(), npmPackage);
+    }
+
+    private List<String> includedModules() {
+        return parseModules(includedModules);
+    }
+
+    private List<String> parseModules(String value) {
+        if (value == null || value.isBlank())
+            return List.of();
+        return Arrays.stream(value.split(","))
+            .map(String::trim)
+            .filter(module -> !module.isEmpty())
+            .toList();
+    }
+
+    private boolean belongsToCurrentPackage(String artifactId) {
+        return includedModules().contains(artifactId) || parseModules(npmPackageModules).contains(artifactId);
     }
 
     private static void addProjectLocations(List<TsGenerationContext.Location> locations,

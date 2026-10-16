@@ -22,7 +22,6 @@ belong to the module being built, nothing is emitted. Otherwise it iterates over
 | `EnumSetDefinition` | `ts/<entry>/<pkg>/<Name>.ts` | `writeEnumSet` |
 | `XEnumSetDefinition` | `ts/<entry>/<pkg>/<Name>.ts` | `writeXEnumSet` |
 | `ClassDefinition` | `ts/<entry>/<pkg>/<Name>.ts` | `writeInterface` |
-| (module) | `ts/<entry>/bona-portable.ts` | `bonaPortableSource` (only if the module generates portable support) |
 | (module) | `ts/<entry>/package.json` | `entryPointPackageJson` |
 | (module) | `ts/<entry>/ng-package.json` | `entryPointNgPackageJson` |
 | (module) | `ts/<entry>/index.ts` | `writeModuleIndex` |
@@ -85,8 +84,8 @@ A branded `string` type.
 
 `writeInterface` emits, for each class:
 
-1. An import of `BonaPortable` (from the module's portable support or the `bonaparte-core` package)
-   plus type imports for referenced types.
+1. An import of `BonaPortable` from the configured runtime package plus type imports for referenced
+   types.
 2. A `const` for the PQON:
    ```ts
    export const SchedulerSetupDTOPQON = "t9t.ssm.SchedulerSetupDTO" as const;
@@ -101,17 +100,8 @@ A branded `string` type.
 4. A **type guard** `isX(value: unknown): value is X` — emitted only when the parent lives in a
    *different* module (cross-module inheritance needs an explicit guard).
 
-### `bona-portable.ts`
-
-When a module generates portable support (its `artifactId` is `bonaparte-core`, or no module is
-set), it emits:
-
-```ts
-export interface BonaPortable {
-    '@PQON': string;
-    [key: string]: unknown;
-}
-```
+`BonaPortable` and the metadata runtime are provided by the external `bonaparte-typescript`
+package. The DSL does not emit `bona-portable.ts` or `bona-meta.ts`.
 
 ## Type mapping
 
@@ -183,8 +173,8 @@ export const ApiKeyDTOMeta: TsClassMeta = {
   reference field declared as `(UserRef...,UserDTO)` that carries the `ref` property.
 - `parent`, `objectType` and `refTarget` are thunks, so circular references between files are safe.
 
-The types and helpers live in `bona-meta.ts`, which `bonaparte-core` emits next to `bona-portable.ts`
-and exports from its index:
+The types and helpers are exported by the external runtime package selected by
+`TypeScript.runtimeImport`:
 
 | Export | Purpose |
 |--------|---------|
@@ -203,15 +193,15 @@ Module resolution is handled by
 It answers three questions:
 
 1. **Is this resource the current module?** (`isCurrentModule`) — via the active
-   `TsGenerationContext` owner, or the `bonaparte.TypeScript.module` preference.
+   `TsGenerationContext` owner.
 2. **Is this resource an included module?** (`isIncludedModule`) — from the
    `bonaparte.TypeScript.includedModules` comma list.
 3. **How do I import a type from another module?** (`crossModuleImport` / `importPath`) — either a
    relative path (same module) or an npm specifier (`<npmPackage>/<artifactId>`).
 
-The output folder is `ts/<entryPoint>/` (or `ts/` when there is no module). The `bonaparte-core`
-module owns `bona-portable.ts`; other modules import it from
-`@arvato-systems-jacs/bonaparte/bonaparte-core`.
+The output folder is `ts/<entryPoint>/` (or `ts/` when there is no module). Generated model and API
+files import portable and metadata runtime types from the package root configured by
+`TypeScript.runtimeImport`.
 
 See [Maven Integration](06-maven-integration.md) for how the module ownership context is built in a
 Maven build.
@@ -221,10 +211,6 @@ Maven build.
 | Setting | Effect |
 |---------|--------|
 | `bonaparte.TypeScript` | Master switch (default `false`). |
-| `bonaparte.TypeScript.module` | The module id this build is producing (Eclipse). |
-| `bonaparte.TypeScript.modulesFile` | Properties file mapping `<artifactId>=<npm-package>,<entry-point>`. |
-| `bonaparte.TypeScript.externalModulesFile` | Properties file for modules that are *not* in the reactor. |
-| `bonaparte.TypeScript.npmPackage` | Fallback npm package scope. |
 | `bonaparte.TypeScript.includedModules` | Comma list of modules to also generate. |
 
 See the [Configuration Reference](07-configuration-reference.md) for the full table.

@@ -430,7 +430,8 @@ public class TypeScriptGeneratorTest {
         Map<String, CharSequence> files = generate(source);
         String metadata = norm(files.get(ROOT + "com/acme/metadata/Metadata.ts"));
 
-        assertTrue(metadata, metadata.contains("import type { TsClassMeta } from \"../../../bona-meta\";"));
+        String runtimeImport = BonScriptPreferences.getTsRuntimeImport();
+        assertTrue(metadata, metadata.contains("import type { TsClassMeta } from \"" + runtimeImport + "\";"));
         assertTrue(metadata, metadata.contains("export const MetadataMeta: TsClassMeta = {"));
         assertTrue(metadata, metadata.contains("pqon: MetadataPQON,"));
         assertFalse(metadata, metadata.contains("parent:"));
@@ -447,10 +448,9 @@ public class TypeScriptGeneratorTest {
 
         String index = norm(files.get(ROOT + "index.ts"));
         assertTrue(index, index.contains("export { MetadataMeta } from './com/acme/metadata/Metadata';"));
-        assertTrue(index, index.contains("export { bonAllFields, bonClassProp, bonValidate } from './bona-meta';"));
-        String runtime = norm(files.get(ROOT + "bona-meta.ts"));
-        assertTrue(runtime, runtime.contains("export interface TsClassMeta {"));
-        assertTrue(runtime, runtime.contains("export function bonValidate("));
+        assertFalse(index, index.contains("export { bonAllFields"));
+        assertNull(files.get(ROOT + "bona-portable.ts"));
+        assertNull(files.get(ROOT + "bona-meta.ts"));
     }
 
     @Test
@@ -505,7 +505,7 @@ public class TypeScriptGeneratorTest {
     }
 
     @Test
-    public void resolvesImportsFromGeneratedPathsInDefaultAndEntrypointLayouts() throws Exception {
+    public void resolvesImportsFromGeneratedPathsInDefaultLayout() throws Exception {
         String source = String.join("\n",
             "package com.acme.deep {",
             "    class Same {}",
@@ -518,65 +518,29 @@ public class TypeScriptGeneratorTest {
             "package com.acme.deep.branch { class Nested {} }",
             "package com.acme.other { class Sibling {} }",
             "");
-        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
-        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
-        String previousNpmPackage = BonScriptPreferences.currentPrefs.tsNpmPackage;
-        try {
-            BonScriptPreferences.currentPrefs.tsModule = null;
-            BonScriptPreferences.currentPrefs.tsModulesFile = null;
-            BonScriptPreferences.currentPrefs.tsNpmPackage = null;
-            Map<String, CharSequence> defaultFiles = generate(source);
-            String defaultSourcePath = ROOT + "com/acme/deep/Source.ts";
-            String defaultOutput = norm(defaultFiles.get(defaultSourcePath));
-            assertTrue(defaultOutput, defaultOutput.contains("from \"./Same\";"));
-            assertTrue(defaultOutput, defaultOutput.contains("from \"./branch/Nested\";"));
-            assertTrue(defaultOutput, defaultOutput.contains("from \"../other/Sibling\";"));
-            assertRelativeImportResolves(defaultFiles, defaultSourcePath, "./Same", ROOT + "com/acme/deep/Same.ts");
-            assertRelativeImportResolves(defaultFiles, defaultSourcePath, "./branch/Nested",
-                ROOT + "com/acme/deep/branch/Nested.ts");
-            assertRelativeImportResolves(defaultFiles, defaultSourcePath, "../other/Sibling",
-                ROOT + "com/acme/other/Sibling.ts");
-
-            Path modulesFile = Files.createTempFile("ts-import-modules", ".properties");
-            Files.writeString(modulesFile, "fixture-api=@fixture/package,fixture\n");
-            BonScriptPreferences.currentPrefs.tsModule = "fixture-api";
-            BonScriptPreferences.currentPrefs.tsModulesFile = modulesFile.toString();
-            Map<String, CharSequence> entrypointFiles = generate(source);
-            String entrypointSourcePath = ROOT + "fixture/com/acme/deep/Source.ts";
-            String entrypointOutput = norm(entrypointFiles.get(entrypointSourcePath));
-            assertTrue(entrypointOutput, entrypointOutput.contains("from \"./Same\";"));
-            assertTrue(entrypointOutput, entrypointOutput.contains("from \"./branch/Nested\";"));
-            assertTrue(entrypointOutput, entrypointOutput.contains("from \"../other/Sibling\";"));
-            assertRelativeImportResolves(entrypointFiles, entrypointSourcePath, "./Same",
-                ROOT + "fixture/com/acme/deep/Same.ts");
-            assertRelativeImportResolves(entrypointFiles, entrypointSourcePath, "./branch/Nested",
-                ROOT + "fixture/com/acme/deep/branch/Nested.ts");
-            assertRelativeImportResolves(entrypointFiles, entrypointSourcePath, "../other/Sibling",
-                ROOT + "fixture/com/acme/other/Sibling.ts");
-            Files.deleteIfExists(modulesFile);
-        } finally {
-            BonScriptPreferences.currentPrefs.tsModule = previousModule;
-            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
-            BonScriptPreferences.currentPrefs.tsNpmPackage = previousNpmPackage;
-            DataTypeExtension.clear();
-        }
+        Map<String, CharSequence> files = generate(source);
+        String sourcePath = ROOT + "com/acme/deep/Source.ts";
+        String output = norm(files.get(sourcePath));
+        assertTrue(output, output.contains("from \"./Same\";"));
+        assertTrue(output, output.contains("from \"./branch/Nested\";"));
+        assertTrue(output, output.contains("from \"../other/Sibling\";"));
+        assertRelativeImportResolves(files, sourcePath, "./Same", ROOT + "com/acme/deep/Same.ts");
+        assertRelativeImportResolves(files, sourcePath, "./branch/Nested", ROOT + "com/acme/deep/branch/Nested.ts");
+        assertRelativeImportResolves(files, sourcePath, "../other/Sibling", ROOT + "com/acme/other/Sibling.ts");
     }
 
     @Test
-    public void standaloneRuntimeImportsResolveFromGeneratedPaths() throws Exception {
-        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
-        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
-        String previousNpmPackage = BonScriptPreferences.currentPrefs.tsNpmPackage;
+    public void standaloneRuntimeImportsUseConfiguredPackageRoot() throws Exception {
+        String previousRuntimeImport = System.getProperty("bonaparte.TypeScript.runtimeImport");
         try {
-            BonScriptPreferences.currentPrefs.tsModule = null;
-            BonScriptPreferences.currentPrefs.tsModulesFile = null;
-            BonScriptPreferences.currentPrefs.tsNpmPackage = null;
+            System.setProperty("bonaparte.TypeScript.runtimeImport", "@fixture/runtime");
             XtextResource resource = parse(BON_SOURCE);
             String expectedModelPath = TsModuleResolver.runtimeSupportImport(findClass(resource, "Base"),
                 "Base", "bona-portable");
             Map<String, CharSequence> modelFiles = generate(BON_SOURCE);
             String model = modelFiles.values().stream().map(TypeScriptGeneratorTest::norm)
                 .filter(content -> content.contains("export interface Base {")).findFirst().orElseThrow();
+            assertEquals("@fixture/runtime", expectedModelPath);
             assertTrue(model, model.contains("import type { BonaPortable } from \"" + expectedModelPath + "\";"));
 
             XtextResource apiResource = parse(API_SOURCE);
@@ -590,9 +554,7 @@ public class TypeScriptGeneratorTest {
             assertTrue(api, api.contains("from '" + expectedApiClient + "';"));
             assertTrue(api, api.contains("from '" + expectedApiUnwrap + "';"));
         } finally {
-            BonScriptPreferences.currentPrefs.tsModule = previousModule;
-            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
-            BonScriptPreferences.currentPrefs.tsNpmPackage = previousNpmPackage;
+            restoreSystemProperty("bonaparte.TypeScript.runtimeImport", previousRuntimeImport);
             DataTypeExtension.clear();
         }
     }
@@ -784,81 +746,6 @@ public class TypeScriptGeneratorTest {
     }
 
     @Test
-    public void moduleMapResolvesNpmEntryPoint() {
-        Properties modules = new Properties();
-        modules.setProperty("t9t-base-api", "@arvato-systems-jacs/t9t-api,base");
-        assertEquals("@arvato-systems-jacs/t9t-api/base",
-            TsModuleResolver.importSpecifier("t9t-base-api", modules));
-        assertEquals("base", TsModuleResolver.entryPoint("t9t-base-api", modules));
-    }
-
-    @Test
-    public void crossModuleImportsUseMappedEntrypointsAndRejectMissingClosure() throws Exception {
-        Path sourceJar = createModuleJar("fixture-source");
-        Path targetJar = createModuleJar("fixture-target");
-        Path modulesFile = Files.createTempFile("ts-cross-module", ".properties");
-        Path externalModulesFile = Files.createTempFile("ts-external-modules", ".properties");
-        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
-        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
-        String previousExternalModulesFile = BonScriptPreferences.currentPrefs.tsExternalModulesFile;
-        try {
-            XtextResourceSet resourceSet = injector.getInstance(XtextResourceSet.class);
-            XtextResource source = load(resourceSet,
-                "package com.acme.source { class Source { required (apiw.Ref) ref; } }",
-                URI.createURI("jar:" + sourceJar.toUri() + "!/source.bon"));
-            XtextResource target = load(resourceSet,
-                "package apip { class Ref {} }\n"
-                    + "package apiw { class Ref {} }\n"
-                    + "package com.acme.target { class Target {} }",
-                URI.createURI("jar:" + targetJar.toUri() + "!/target.bon"));
-            ClassDefinition sourceType = findClass(source, "Source");
-            ClassDefinition targetType = findClass(target, "Target");
-            BonScriptPreferences.currentPrefs.tsModule = "fixture-source";
-            BonScriptPreferences.currentPrefs.tsModulesFile = modulesFile.toString();
-            BonScriptPreferences.currentPrefs.tsExternalModulesFile = externalModulesFile.toString();
-
-            Files.writeString(externalModulesFile, "fixture-target=@fixture/bonaparte-api,bonaparte-core\n");
-            BonScriptPreferences.currentPrefs.tsModulesFile = null;
-            assertEquals("@fixture/bonaparte-api/bonaparte-core",
-                TsModuleResolver.importPath(sourceType, "Source", targetType, "Target"));
-
-            Files.writeString(externalModulesFile, "");
-            BonScriptPreferences.currentPrefs.tsModulesFile = modulesFile.toString();
-            Files.writeString(modulesFile, "fixture-target=@fixture/package,target\n");
-            assertEquals("@fixture/package/target",
-                TsModuleResolver.importPath(sourceType, "Source", targetType, "Target"));
-
-            Files.writeString(modulesFile,
-                "fixture-source=@fixture/package,source\nfixture-target=@fixture/package,target\n");
-            InMemoryFileSystemAccess fsa = new InMemoryFileSystemAccess();
-            injector.getInstance(TypeScriptBonScriptGeneratorMain.class)
-                .doGenerate(source, fsa, new GeneratorContext());
-            String generatedSource = norm(fsa.getTextFiles().get(
-                ROOT + "source/com/acme/source/Source.ts"));
-            assertTrue(generatedSource, generatedSource.contains(
-                "import type { ApiwRef as Ref } from \"@fixture/package/target\";"));
-            assertTrue(generatedSource, generatedSource.contains("ref: Ref;"));
-
-            Files.writeString(modulesFile, "fixture-source=@fixture/package,source\n");
-            try {
-                TsModuleResolver.importPath(sourceType, "Source", targetType, "Target");
-                throw new AssertionError("Expected missing dependency-closure mapping to fail");
-            } catch (IllegalStateException e) {
-                assertTrue(e.getMessage(), e.getMessage().contains("does not contain module fixture-target"));
-            }
-        } finally {
-            BonScriptPreferences.currentPrefs.tsModule = previousModule;
-            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
-            BonScriptPreferences.currentPrefs.tsExternalModulesFile = previousExternalModulesFile;
-            Files.deleteIfExists(sourceJar);
-            Files.deleteIfExists(targetJar);
-            Files.deleteIfExists(modulesFile);
-            Files.deleteIfExists(externalModulesFile);
-            DataTypeExtension.clear();
-        }
-    }
-
-    @Test
     public void ownershipContextGeneratesCrossRepositoryImportsWithoutModuleMaps() throws Exception {
         Path sourceJar = createModuleJar("commerce-api");
         Path targetJar = createModuleJar("bonaparte-api-auth");
@@ -904,6 +791,24 @@ public class TypeScriptGeneratorTest {
             Files.deleteIfExists(targetJar);
             DataTypeExtension.clear();
         }
+    }
+
+    @Test
+    public void includedModulesAreScopedToOwnershipContext() throws Exception {
+        var owner = new TsGenerationContext.Owner("fixture", "fixture-api", "1.0", "@fixture/package");
+        var coreOwner = new TsGenerationContext.Owner("de.jpaw", "bonaparte-core", "8.0.1", "@fixture/package");
+        XtextResourceSet resources = injector.getInstance(XtextResourceSet.class);
+        TsGenerationContext.attach(resources, new TsGenerationContext(owner, List.of(
+            new TsGenerationContext.Location(URI.createURI("dummy:/api/"), owner),
+            new TsGenerationContext.Location(URI.createURI("dummy:/core/"), coreOwner)),
+            List.of("bonaparte-core")));
+        XtextResource included = load(resources, "package fixture.core { class CoreType {} }",
+            URI.createURI("dummy:/core/core.bon"));
+        XtextResource excluded = load(resources, "package fixture.other { class OtherType {} }",
+            URI.createURI("dummy:/api/api.bon"));
+
+        assertTrue(TsModuleResolver.isIncludedModule(included));
+        assertFalse(TsModuleResolver.isIncludedModule(excluded));
     }
 
     @Test
@@ -973,29 +878,31 @@ public class TypeScriptGeneratorTest {
     @Test
     public void ownershipContextGeneratesApiIndexWithoutLegacySettings() throws Exception {
         var owner = new TsGenerationContext.Owner("fixture", "fixture-api", "1.0", "@fixture/package");
-        var runtimeOwner = new TsGenerationContext.Owner("com.arvato-systems.t9t", "t9t-base-api", "1.0", "@fixture/t9t");
+        var runtimeOwner = new TsGenerationContext.Owner("fixture.runtime", "fixture-core", "1.0", "@fixture/runtime");
         XtextResourceSet resources = injector.getInstance(XtextResourceSet.class);
         TsGenerationContext.attach(resources, new TsGenerationContext(owner,
             List.of(new TsGenerationContext.Location(URI.createURI("dummy:/"), owner),
                 new TsGenerationContext.Location(URI.createURI("dummy:/runtime/"), runtimeOwner))));
         XtextResource source = load(resources, API_SOURCE, URI.createURI("dummy:/api.bon"));
-        String previousModule = System.getProperty("bonaparte.TypeScript.module");
-        String previousMap = System.getProperty("bonaparte.TypeScript.modulesFile");
+        String previousRpcImport = System.getProperty("bonaparte.TypeScript.rpcImport");
+        String previousRuntimeImport = System.getProperty("bonaparte.TypeScript.runtimeImport");
         try {
-            System.setProperty("bonaparte.TypeScript.module", "wrong-module");
-            System.setProperty("bonaparte.TypeScript.modulesFile", "nonexistent-module-map.properties");
+            System.setProperty("bonaparte.TypeScript.rpcImport", "@fixture/runtime");
+            System.setProperty("bonaparte.TypeScript.runtimeImport", "@fixture/runtime");
             InMemoryFileSystemAccess fsa = new InMemoryFileSystemAccess();
             injector.getInstance(TsApiClientGenerator.class).doGenerate(source, fsa);
             String index = norm(fsa.getTextFiles().get(ROOT + "fixture-api/api-index.ts"));
             assertTrue(index, index.contains("export { ProductApi }"));
             String api = norm(fsa.getTextFiles().get(ROOT + "fixture-api/com/acme/api/ProductApi.ts"));
-            assertTrue(api, api.contains("import { RpcClient } from '@fixture/t9t';"));
-            assertTrue(api, api.contains("} from '@fixture/t9t';"));
+            assertTrue(api, api.contains("import { RpcClient } from '@fixture/runtime';"));
+            assertTrue(api, api.contains("} from '@fixture/runtime';"));
+            assertTrue(api, api.contains("import type { BonaPortable } from '@fixture/runtime';"));
+            assertNull(fsa.getTextFiles().get(ROOT + "fixture-api/bona-portable.ts"));
+            assertNull(fsa.getTextFiles().get(ROOT + "fixture-api/bona-meta.ts"));
             assertFalse(api, api.contains("import { RpcClient } from '@fixture/package';"));
-            assertNull(fsa.getTextFiles().get(ROOT + "wrong-module/api-index.ts"));
         } finally {
-            restoreSystemProperty("bonaparte.TypeScript.module", previousModule);
-            restoreSystemProperty("bonaparte.TypeScript.modulesFile", previousMap);
+            restoreSystemProperty("bonaparte.TypeScript.rpcImport", previousRpcImport);
+            restoreSystemProperty("bonaparte.TypeScript.runtimeImport", previousRuntimeImport);
             DataTypeExtension.clear();
         }
     }
@@ -1003,40 +910,21 @@ public class TypeScriptGeneratorTest {
     @Test
     public void bonScriptTypeScriptSettingsReadSystemPropertiesDynamically() {
         String previousTypeScript = System.getProperty("bonaparte.TypeScript");
-        String previousModule = System.getProperty("bonaparte.TypeScript.module");
-        String previousModulesFile = System.getProperty("bonaparte.TypeScript.modulesFile");
-        String previousNpmPackage = System.getProperty("bonaparte.TypeScript.npmPackage");
+        String previousRuntimeImport = System.getProperty("bonaparte.TypeScript.runtimeImport");
+        String previousRpcImport = System.getProperty("bonaparte.TypeScript.rpcImport");
         try {
             System.setProperty("bonaparte.TypeScript", "true");
-            System.setProperty("bonaparte.TypeScript.module", "fixture-api");
-            System.setProperty("bonaparte.TypeScript.modulesFile", "fixture-modules.properties");
-            System.setProperty("bonaparte.TypeScript.npmPackage", "@arvato-systems-jacs/t9t-api");
+            System.setProperty("bonaparte.TypeScript.runtimeImport", "@fixture/runtime");
+            System.setProperty("bonaparte.TypeScript.rpcImport", "@fixture/runtime");
             assertTrue(BonScriptPreferences.getDoTypeScript());
-            assertEquals("fixture-api", BonScriptPreferences.getTsModule());
-            assertEquals("fixture-modules.properties", BonScriptPreferences.getTsModulesFile());
-            assertEquals("@arvato-systems-jacs/t9t-api", BonScriptPreferences.getTsNpmPackage());
+            assertEquals("@fixture/runtime", BonScriptPreferences.getTsRuntimeImport());
+            assertEquals("@fixture/runtime", BonScriptPreferences.getTsRpcImport());
+            System.setProperty("bonaparte.TypeScript.rpcImport", "@fixture/other-runtime");
+            assertEquals("@fixture/other-runtime", BonScriptPreferences.getTsRpcImport());
         } finally {
             restoreSystemProperty("bonaparte.TypeScript", previousTypeScript);
-            restoreSystemProperty("bonaparte.TypeScript.module", previousModule);
-            restoreSystemProperty("bonaparte.TypeScript.modulesFile", previousModulesFile);
-            restoreSystemProperty("bonaparte.TypeScript.npmPackage", previousNpmPackage);
-        }
-    }
-
-    @Test
-    public void configuredNpmPackageProvidesDefaultSecondaryEntrypoint() {
-        String previousModule = System.getProperty("bonaparte.TypeScript.module");
-        String previousModulesFile = System.getProperty("bonaparte.TypeScript.modulesFile");
-        String previousNpmPackage = System.getProperty("bonaparte.TypeScript.npmPackage");
-        try {
-            System.setProperty("bonaparte.TypeScript.module", "t9t-base-api");
-            System.clearProperty("bonaparte.TypeScript.modulesFile");
-            System.setProperty("bonaparte.TypeScript.npmPackage", "@arvato-systems-jacs/t9t-api");
-            assertEquals("t9t-base-api", TsModuleResolver.currentEntryPoint());
-        } finally {
-            restoreSystemProperty("bonaparte.TypeScript.module", previousModule);
-            restoreSystemProperty("bonaparte.TypeScript.modulesFile", previousModulesFile);
-            restoreSystemProperty("bonaparte.TypeScript.npmPackage", previousNpmPackage);
+            restoreSystemProperty("bonaparte.TypeScript.runtimeImport", previousRuntimeImport);
+            restoreSystemProperty("bonaparte.TypeScript.rpcImport", previousRpcImport);
         }
     }
 
@@ -1048,28 +936,29 @@ public class TypeScriptGeneratorTest {
     }
 
     @Test
-    public void generatesNgPackagrSecondaryEntryPoint() throws Exception {
-        Path modulesFile = Files.createTempFile("ts-modules", ".properties");
-        Files.writeString(modulesFile, "fixture-api=@arvato-systems-jacs/t9t-api,auth\n");
-        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
-        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
-        BonScriptPreferences.currentPrefs.tsModule = "fixture-api";
-        BonScriptPreferences.currentPrefs.tsModulesFile = modulesFile.toString();
+    public void generatesMavenOwnedPackageRoot() throws Exception {
+        String previousRuntimeImport = System.getProperty("bonaparte.TypeScript.runtimeImport");
+        System.setProperty("bonaparte.TypeScript.runtimeImport", "@fixture/runtime");
+        var owner = new TsGenerationContext.Owner("fixture", "fixture-api", "1.0", "@fixture/package");
+        XtextResourceSet resources = injector.getInstance(XtextResourceSet.class);
+        TsGenerationContext.attach(resources, new TsGenerationContext(owner,
+            List.of(new TsGenerationContext.Location(URI.createURI("dummy:/"), owner))));
         try {
-            XtextResource resource = parse(BON_SOURCE);
+            XtextResource resource = load(resources, BON_SOURCE, URI.createURI("dummy:/fixture.bon"));
             InMemoryFileSystemAccess fsa = new InMemoryFileSystemAccess();
             injector.getInstance(TypeScriptBonScriptGeneratorMain.class)
                 .doGenerate(resource, fsa, new GeneratorContext());
 
             Map<String, CharSequence> files = fsa.getTextFiles();
-            String entryRoot = ROOT + "auth/";
+            String entryRoot = ROOT + "fixture-api/";
             assertTrue(norm(files.get(entryRoot + "package.json")).contains("\"entryFile\": \"index.ts\""));
             assertTrue(norm(files.get(entryRoot + "ng-package.json")).contains("\"entryFile\": \"index.ts\""));
             String index = norm(files.get(entryRoot + "index.ts"));
             assertFalse(index, index.contains("export type { BonaPortable }"));
             assertNull(files.get(entryRoot + "bona-portable.ts"));
+            assertNull(files.get(entryRoot + "bona-meta.ts"));
             String child = norm(files.get(entryRoot + "com/acme/auth/Child.ts"));
-            assertTrue(child, child.contains("import type { BonaPortable } from \"@arvato-systems-jacs/bonaparte/bonaparte-core\";"));
+            assertTrue(child, child.contains("import type { BonaPortable } from \"@fixture/runtime\";"));
             assertTrue(index, index.contains("export { ChildPQON }"));
             assertTrue(index, index.contains("export type { Child }"));
             assertTrue(index, index.contains("export type { SortOrderSet }"));
@@ -1086,25 +975,22 @@ public class TypeScriptGeneratorTest {
             assertTrue(stringSet, stringSet.contains("= string & { readonly [StringSortOrderSetBrand]"));
 
             InMemoryFileSystemAccess apiFsa = new InMemoryFileSystemAccess();
-            injector.getInstance(TsApiClientGenerator.class).doGenerate(parse(API_SOURCE), apiFsa);
+            XtextResource apiResource = load(resources, API_SOURCE, URI.createURI("dummy:/api.bon"));
+            injector.getInstance(TsApiClientGenerator.class).doGenerate(apiResource, apiFsa);
             String apiIndex = norm(apiFsa.getTextFiles().get(entryRoot + "api-index.ts"));
             assertTrue(apiIndex, apiIndex.contains("export { ProductApi }"));
         } finally {
-            BonScriptPreferences.currentPrefs.tsModule = previousModule;
-            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
-            Files.deleteIfExists(modulesFile);
+            restoreSystemProperty("bonaparte.TypeScript.runtimeImport", previousRuntimeImport);
             DataTypeExtension.clear();
         }
     }
 
     @Test
     public void apiServicesUseCorePortableTypeAndPrimaryRpcRuntime() throws Exception {
-        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
-        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
-        String previousNpmPackage = BonScriptPreferences.currentPrefs.tsNpmPackage;
-        BonScriptPreferences.currentPrefs.tsModule = "fixture-api";
-        BonScriptPreferences.currentPrefs.tsModulesFile = null;
-        BonScriptPreferences.currentPrefs.tsNpmPackage = "@fixture/t9t-api";
+        String previousRuntimeImport = System.getProperty("bonaparte.TypeScript.runtimeImport");
+        String previousRpcImport = System.getProperty("bonaparte.TypeScript.rpcImport");
+        System.setProperty("bonaparte.TypeScript.runtimeImport", "@fixture/runtime");
+        System.setProperty("bonaparte.TypeScript.rpcImport", "@fixture/package");
         try {
             InMemoryFileSystemAccess fsa = new InMemoryFileSystemAccess();
             injector.getInstance(TsApiClientGenerator.class).doGenerate(parse(API_SOURCE), fsa);
@@ -1112,44 +998,32 @@ public class TypeScriptGeneratorTest {
                 .map(TypeScriptGeneratorTest::norm)
                 .filter(content -> content.contains("export class ProductApi"))
                 .findFirst().orElseThrow();
-            assertTrue(api, api.contains("import type { BonaPortable } from '@arvato-systems-jacs/bonaparte/bonaparte-core';"));
-            assertTrue(api, api.contains("import { RpcClient } from '@fixture/t9t-api';"));
-            assertTrue(api, api.contains("} from '@fixture/t9t-api';"));
+            assertTrue(api, api.contains("import type { BonaPortable } from '@fixture/runtime';"));
+            assertTrue(api, api.contains("import { RpcClient } from '@fixture/package';"));
+            assertTrue(api, api.contains("} from '@fixture/package';"));
         } finally {
-            BonScriptPreferences.currentPrefs.tsModule = previousModule;
-            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
-            BonScriptPreferences.currentPrefs.tsNpmPackage = previousNpmPackage;
+            restoreSystemProperty("bonaparte.TypeScript.runtimeImport", previousRuntimeImport);
+            restoreSystemProperty("bonaparte.TypeScript.rpcImport", previousRpcImport);
             DataTypeExtension.clear();
         }
     }
 
     @Test
-    public void onlyCoreGeneratesAndExportsPortableSupport() throws Exception {
-        String previousModule = BonScriptPreferences.currentPrefs.tsModule;
-        String previousModulesFile = BonScriptPreferences.currentPrefs.tsModulesFile;
-        String previousNpmPackage = BonScriptPreferences.currentPrefs.tsNpmPackage;
+    public void runtimeSupportComesFromConfiguredPackageWithoutGeneration() throws Exception {
+        String previousRuntimeImport = System.getProperty("bonaparte.TypeScript.runtimeImport");
+        System.setProperty("bonaparte.TypeScript.runtimeImport", "@fixture/custom-runtime");
         try {
-            BonScriptPreferences.currentPrefs.tsModule = "bonaparte-core";
-            BonScriptPreferences.currentPrefs.tsModulesFile = null;
-            BonScriptPreferences.currentPrefs.tsNpmPackage = "@arvato-systems-jacs/bonaparte";
             Map<String, CharSequence> coreFiles = generate(BON_SOURCE);
-            String coreRoot = ROOT + "bonaparte-core/";
-            assertTrue(norm(coreFiles.get(coreRoot + "bona-portable.ts")).contains("export interface BonaPortable"));
-            assertTrue(norm(coreFiles.get(coreRoot + "index.ts")).contains("export type { BonaPortable } from './bona-portable';"));
-            assertRelativeImportResolves(coreFiles, coreRoot + "com/acme/base/Base.ts", "../../../bona-portable",
-                coreRoot + "bona-portable.ts");
+            String coreRoot = ROOT;
+            assertNull(coreFiles.get(coreRoot + "bona-portable.ts"));
+            assertNull(coreFiles.get(coreRoot + "bona-meta.ts"));
+            assertFalse(norm(coreFiles.get(coreRoot + "index.ts")).contains("export type { BonaPortable }"));
+            assertFalse(norm(coreFiles.get(coreRoot + "index.ts")).contains("export { bonAllFields"));
+            String model = norm(coreFiles.get(coreRoot + "com/acme/base/Base.ts"));
+            assertTrue(model, model.contains("import type { BonaPortable } from \"@fixture/custom-runtime\";"));
 
-            BonScriptPreferences.currentPrefs.tsModule = "bonaparte-api-auth";
-            Map<String, CharSequence> authFiles = generate(BON_SOURCE);
-            String authRoot = ROOT + "bonaparte-api-auth/";
-            assertNull(authFiles.get(authRoot + "bona-portable.ts"));
-            assertFalse(norm(authFiles.get(authRoot + "index.ts")).contains("export type { BonaPortable }"));
-            assertTrue(norm(authFiles.get(authRoot + "com/acme/base/Base.ts")).contains(
-                "import type { BonaPortable } from \"@arvato-systems-jacs/bonaparte/bonaparte-core\";"));
         } finally {
-            BonScriptPreferences.currentPrefs.tsModule = previousModule;
-            BonScriptPreferences.currentPrefs.tsModulesFile = previousModulesFile;
-            BonScriptPreferences.currentPrefs.tsNpmPackage = previousNpmPackage;
+            restoreSystemProperty("bonaparte.TypeScript.runtimeImport", previousRuntimeImport);
             DataTypeExtension.clear();
         }
     }

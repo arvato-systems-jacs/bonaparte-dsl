@@ -46,10 +46,7 @@ public class BonScriptPreferences {
     static private final boolean doXsdDefault                   = configReader.getProp("doXsd", true);
     static private final boolean doTypeScriptDefault            = configReader.getProp("TypeScript", false);
     static private final boolean doTypeScriptApiDefault         = configReader.getProp("TypeScriptApi", false);
-    static private final String tsModuleDefault                 = configReader.getProp("TypeScript.module", null);
-    static private final String tsModulesFileDefault            = configReader.getProp("TypeScript.modulesFile", null);
-    static private final String tsExternalModulesFileDefault    = configReader.getProp("TypeScript.externalModulesFile", null);
-    static private final String tsNpmPackageDefault             = configReader.getProp("TypeScript.npmPackage", null);
+    static private final String tsRuntimeImportDefault          = configReader.getProp("TypeScript.runtimeImport", "@arvato-systems-jacs/bonaparte-typescript");
     static private final boolean jakartaOutputDefault           = configReader.getProp("jakarta", true);  // use jakarta instead of javax
     static private final boolean defaultExternalizeDefault      = configReader.getProp("Externalize", false);
     static private final boolean defaultHazelcastDsDefault      = configReader.getProp("HazelcastDs", false);
@@ -70,10 +67,7 @@ public class BonScriptPreferences {
     public boolean doXsd                    = doXsdDefault;
     public boolean doTypeScript             = doTypeScriptDefault;
     public boolean doTypeScriptApi          = doTypeScriptApiDefault;
-    public String tsModule                  = tsModuleDefault;
-    public String tsModulesFile             = tsModulesFileDefault;
-    public String tsExternalModulesFile     = tsExternalModulesFileDefault;
-    public String tsNpmPackage              = tsNpmPackageDefault;
+    public String tsRuntimeImport           = tsRuntimeImportDefault;
     public boolean jakartaOutput            = jakartaOutputDefault;
     public boolean defaultExternalize       = defaultExternalizeDefault;
     public boolean defaultHazelcastDs       = defaultHazelcastDsDefault;
@@ -124,19 +118,13 @@ public class BonScriptPreferences {
     def public static getDoTypeScriptApi() {
         return configReader.getProp("TypeScriptApi", currentPrefs.doTypeScriptApi)
     }
-    def public static getTsModule() {
-        return configReader.getProp("TypeScript.module", currentPrefs.tsModule)
-    }
-    def public static getTsModulesFile() {
-        return configReader.getProp("TypeScript.modulesFile", currentPrefs.tsModulesFile)
-    }
-    def public static getTsExternalModulesFile() {
-        return configReader.getProp("TypeScript.externalModulesFile", currentPrefs.tsExternalModulesFile)
-    }
-    def public static getTsNpmPackage() {
-        return configReader.getProp("TypeScript.npmPackage", currentPrefs.tsNpmPackage)
-    }
     def public static getTsIncludedModules() {
         return configReader.getProp("TypeScript.includedModules", null)
+    }
+    def public static getTsRuntimeImport() {
+        return configReader.getProp("TypeScript.runtimeImport", currentPrefs.tsRuntimeImport)
+    }
+    def public static getTsRpcImport() {
+        return configReader.getProp("TypeScript.rpcImport", null)
     }
 }

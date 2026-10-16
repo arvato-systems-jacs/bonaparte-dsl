@@ -1,7 +1,6 @@
 package de.jpaw.bonaparte.dsl.generator.ts;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -20,8 +19,6 @@ import de.jpaw.bonaparte.dsl.bonScript.PackageDefinition;
 public final class TsModuleResolver {
     private static final String POM_PROPERTIES = "META-INF/maven/";
     private static final String MODULES_PROPERTY_SEPARATOR = ",";
-    private static final String PORTABLE_OWNER_MODULE = "bonaparte-core";
-    private static final String PORTABLE_OWNER_IMPORT = "@arvato-systems-jacs/bonaparte/bonaparte-core";
 
     private TsModuleResolver() {
     }
@@ -31,11 +28,8 @@ public final class TsModuleResolver {
         if (context != null)
             return "bon".equals(resource.getURI().fileExtension())
                 && context.currentOwner().equals(context.owner(resource.getURI()));
-        String currentModule = BonScriptPreferences.getTsModule();
         String resourceModule = moduleId(resource.getURI());
-        if (resourceModule == null)
-            return true;
-        return currentModule != null && currentModule.equals(resourceModule);
+        return "bon".equals(resource.getURI().fileExtension()) && resourceModule == null;
     }
 
     public static boolean isSameModule(EObject left, EObject right) {
@@ -62,7 +56,13 @@ public final class TsModuleResolver {
     }
 
     public static boolean isIncludedModule(Resource resource) {
-        String resourceModule = moduleId(resource.getURI());
+        if (!"bon".equals(resource.getURI().fileExtension()))
+            return false;
+        TsGenerationContext context = TsGenerationContext.from(resource);
+        String resourceModule = context == null ? moduleId(resource.getURI())
+            : context.owner(resource.getURI()).artifactId();
+        if (context != null)
+            return context.includesModule(resourceModule);
         String includedModules = BonScriptPreferences.getTsIncludedModules();
         if (resourceModule == null || includedModules == null || includedModules.isBlank())
             return false;
@@ -89,32 +89,12 @@ public final class TsModuleResolver {
             TsGenerationContext.Owner targetOwner = context.owner(target.eResource().getURI());
             return sourceOwner.equals(targetOwner) ? null : targetOwner.importSpecifier();
         }
-        String currentModule = moduleId(from.eResource().getURI());
+        String sourceModule = moduleId(from.eResource().getURI());
         String targetModule = moduleId(target.eResource().getURI());
-        if (currentModule == null || targetModule == null || currentModule.equals(targetModule))
+        if (sourceModule == null || targetModule == null || sourceModule.equals(targetModule))
             return null;
-
-        String externalModulesFile = BonScriptPreferences.getTsExternalModulesFile();
-        if (externalModulesFile != null && !externalModulesFile.isBlank()) {
-            Properties externalModules = loadModules(externalModulesFile);
-            if (externalModules.containsKey(targetModule))
-                return importSpecifier(targetModule, externalModules);
-        }
-
-        String modulesFile = BonScriptPreferences.getTsModulesFile();
-        if (modulesFile == null || modulesFile.isBlank()) {
-            String npmPackage = BonScriptPreferences.getTsNpmPackage();
-            if (npmPackage != null && !npmPackage.isBlank())
-                return npmPackage + "/" + targetModule;
-            throw new IllegalStateException("Cross-module TypeScript import from " + currentModule + " to "
-                    + targetModule + " requires bonaparte.TypeScript.modulesFile");
-        }
-
-        Properties modules = loadModules(modulesFile);
-        if (!modules.containsKey(targetModule))
-            throw new IllegalStateException("TypeScript dependency closure for " + currentModule
-                    + " does not contain module " + targetModule);
-        return importSpecifier(targetModule, modules);
+        throw new IllegalStateException("Cross-module TypeScript imports require Maven ownership context: "
+                + sourceModule + " -> " + targetModule);
     }
 
     public static String importPath(EObject from, String fromTypeName, EObject target, String targetTypeName) {
@@ -139,32 +119,18 @@ public final class TsModuleResolver {
             throw new IllegalArgumentException("Cannot resolve TypeScript runtime import without a source BON type");
         if (fromTypeName == null || fromTypeName.isBlank() || supportModule == null || supportModule.isBlank())
             throw new IllegalArgumentException("Cannot resolve TypeScript runtime import without generated source and support names");
-        if ("bona-portable".equals(supportModule) || TsMetaRuntimeSource.MODULE_NAME.equals(supportModule)) {
-            Resource resource = from.eResource();
-            if (!generatesPortableSupport(resource))
-                return PORTABLE_OWNER_IMPORT;
-            String folder = resource == null ? outputFolder() : outputFolder(resource);
-            return relativeSpecifier(generatedTypePath(from, fromTypeName), Paths.get(folder, supportModule));
+        if ("bona-portable".equals(supportModule) || "bona-meta".equals(supportModule)) {
+            String runtimeImport = BonScriptPreferences.getTsRuntimeImport();
+            if (runtimeImport == null || runtimeImport.isBlank())
+                throw new IllegalStateException("TypeScript runtime imports require bonaparte.TypeScript.runtimeImport");
+            return runtimeImport;
         }
-        TsGenerationContext context = TsGenerationContext.from(from.eResource());
-        if (context != null)
-            return context.dependencyOwner("com.arvato-systems.t9t", "t9t-base-api").npmPackage();
-        String npmPackage = BonScriptPreferences.getTsNpmPackage();
-        if (npmPackage != null && !npmPackage.isBlank())
-            return npmPackage;
+        String rpcImport = BonScriptPreferences.getTsRpcImport();
+        if (rpcImport != null && !rpcImport.isBlank())
+            return rpcImport;
         Path source = generatedTypePath(from, fromTypeName);
         Path target = Paths.get("ts", "rpc-core", supportModule);
         return relativeSpecifier(source, target);
-    }
-
-    public static boolean generatesPortableSupport(Resource resource) {
-        TsGenerationContext context = TsGenerationContext.from(resource);
-        if (context != null)
-            return PORTABLE_OWNER_MODULE.equals(context.owner(resource.getURI()).artifactId());
-        String artifactId = resource == null ? null : moduleId(resource.getURI());
-        if (artifactId == null)
-            artifactId = BonScriptPreferences.getTsModule();
-        return artifactId == null || artifactId.isBlank() || PORTABLE_OWNER_MODULE.equals(artifactId);
     }
 
     public static String packagePath(EObject type) {
@@ -228,42 +194,20 @@ public final class TsModuleResolver {
         return specifier.startsWith(".") ? specifier : "./" + specifier;
     }
 
-    public static String importSpecifier(String artifactId, Properties modules) {
-        String[] mapping = moduleMapping(artifactId, modules);
-        return mapping[0] + "/" + mapping[1];
-    }
-
-    public static String currentEntryPoint() {
-        String currentModule = BonScriptPreferences.getTsModule();
-        String modulesFile = BonScriptPreferences.getTsModulesFile();
-        if (currentModule == null || currentModule.isBlank())
-            return null;
-        if (modulesFile == null || modulesFile.isBlank())
-            return BonScriptPreferences.getTsNpmPackage() == null ? null : currentModule;
-        return entryPoint(currentModule, loadModules(modulesFile));
-    }
-
     public static String currentEntryPoint(Resource resource) {
         TsGenerationContext context = TsGenerationContext.from(resource);
-        return context == null ? currentEntryPoint() : context.currentOwner().artifactId();
+        return context == null ? null : context.currentOwner().artifactId();
     }
 
     public static String outputFolder() {
-        String entryPoint = currentEntryPoint();
-        return entryPoint == null ? "ts/" : "ts/" + entryPoint + "/";
+        return "ts/";
     }
 
     public static String outputFolder(Resource resource) {
         TsGenerationContext context = TsGenerationContext.from(resource);
         if (context != null)
             return "ts/" + context.owner(resource.getURI()).artifactId() + "/";
-        String artifactId = moduleId(resource.getURI());
-        if (artifactId == null)
-            return outputFolder();
-        String modulesFile = BonScriptPreferences.getTsModulesFile();
-        String entryPoint = modulesFile == null || modulesFile.isBlank()
-                ? artifactId : entryPoint(artifactId, loadModules(modulesFile));
-        return "ts/" + entryPoint + "/";
+        return outputFolder();
     }
 
     public static boolean isModule(Resource resource, String artifactId) {
@@ -273,34 +217,10 @@ public final class TsModuleResolver {
         return artifactId.equals(resourceModule);
     }
 
-    public static String entryPoint(String artifactId, Properties modules) {
-        return moduleMapping(artifactId, modules)[1];
-    }
-
-    private static String[] moduleMapping(String artifactId, Properties modules) {
-        String[] mapping = modules.getProperty(artifactId, "").split(MODULES_PROPERTY_SEPARATOR, 2);
-        if (mapping.length != 2 || mapping[0].isBlank() || mapping[1].isBlank())
-            throw new IllegalStateException("Invalid or missing TypeScript module mapping for " + artifactId
-                    + ": expected <npm-package>,<entry-point>");
-        return new String[] { mapping[0].trim(), mapping[1].trim() };
-    }
-
-    private static Properties loadModules(String path) {
-        Properties modules = new Properties();
-        try (InputStream input = new FileInputStream(path)) {
-            modules.load(input);
-        } catch (IOException e) {
-            throw new IllegalStateException("Cannot read TypeScript module map " + path, e);
-        }
-        return modules;
-    }
-
     public static String moduleId(URI uri) {
         String value = uri.toString();
         if (value.startsWith("jar:") || value.startsWith("archive:"))
             return moduleIdFromJar(value);
-        if (value.startsWith("file:"))
-            return BonScriptPreferences.getTsModule();
         return null;
     }
 

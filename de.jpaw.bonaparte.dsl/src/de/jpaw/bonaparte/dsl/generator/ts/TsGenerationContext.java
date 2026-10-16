@@ -67,14 +67,24 @@ public final class TsGenerationContext {
 
     private final Owner currentOwner;
     private final List<Location> locations;
+    private final List<String> includedModules;
 
     public TsGenerationContext(Owner currentOwner, List<Location> locations) {
+        this(currentOwner, locations, List.of());
+    }
+
+    public TsGenerationContext(Owner currentOwner, List<Location> locations, List<String> includedModules) {
         this.currentOwner = Objects.requireNonNull(currentOwner, "currentOwner");
         this.locations = List.copyOf(locations);
+        this.includedModules = List.copyOf(includedModules);
     }
 
     public Owner currentOwner() {
         return currentOwner;
+    }
+
+    public boolean includesModule(String artifactId) {
+        return includedModules.contains(artifactId);
     }
 
     public Owner dependencyOwner(String groupId, String artifactId) {
