@@ -1219,6 +1219,40 @@ public class TypeScriptGeneratorTest {
     }
 
     @Test
+    public void generatedApiServicesExposeTypedResponsePreservingMethods() throws Exception {
+        String source = String.join("\n",
+            "package com.acme.api {",
+            "    class ServiceResponse {}",
+            "    class SearchResponse<DATA, TRACKING> extends ServiceResponse {}",
+            "    class ReadAllResponse<DATA, TRACKING> extends SearchResponse<!DATA, !TRACKING> {}",
+            "    class CrudAnyKeyResponse<DATA, TRACKING> extends ServiceResponse { optional (!DATA) data; optional long key; }",
+            "    class CrudSurrogateResponse<DATA, TRACKING> extends CrudAnyKeyResponse<!DATA, !TRACKING> {}",
+            "    abstract class SearchFilter {}",
+            "    class StringFilter extends SearchFilter {}",
+            "    class BooleanFilter extends SearchFilter {}",
+            "    class AndFilter extends SearchFilter {}",
+            "    class SearchCriteria { optional (SearchFilter...) searchFilter; }",
+            "    class SearchRequest<DATA, TRACKING> extends SearchCriteria return ReadAllResponse<!DATA, !TRACKING> {}",
+            "    class CrudSurrogateKeyRequest<REF, DATA, TRACKING> return CrudSurrogateResponse<!DATA, !TRACKING> {}",
+            "    class ProductDTO {}",
+            "    class ProductRef {}",
+            "    class FullTracking {}",
+            "    class ProductSearchRequest extends SearchRequest<ProductDTO, FullTracking> {}",
+            "    class ProductCrudRequest extends CrudSurrogateKeyRequest<ProductRef, ProductDTO, FullTracking> {}",
+            "}",
+            "");
+
+        String api = norm(generateApis(source).get(ROOT + "com/acme/api/ProductApi.ts"));
+
+        assertTrue(api, api.contains("searchResponse(params: Omit<ProductSearchRequest, '@PQON' | 'offset' | 'searchFilter'> & { offset?: number } & { searchFilter?: StringFilter | BooleanFilter | AndFilter | null }): Observable<Omit<ReadAllResponse<ProductDTO, FullTracking>, 'returnCode'>>"));
+        assertTrue(api, api.contains("map(unwrapService<ReadAllResponse<ProductDTO, FullTracking>>)"));
+        assertTrue(api, api.contains("executeResponse(params: Omit<ProductCrudRequest, '@PQON'>): Observable<Omit<CrudSurrogateResponse<ProductDTO, FullTracking>, 'returnCode'>>"));
+        assertTrue(api, api.contains("map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>)"));
+        assertTrue(api, api.contains("execute(params: Omit<ProductCrudRequest, '@PQON'>): Observable<ProductDTO>"));
+        assertTrue(api, api.contains("search(params: Omit<ProductSearchRequest, '@PQON' | 'offset' | 'searchFilter'> & { offset?: number } & { searchFilter?: StringFilter | BooleanFilter | AndFilter | null }): Observable<ProductDTO[]>"));
+    }
+
+    @Test
     public void concreteSearchResponseImportsTheResolvedResultDto() throws Exception {
         String source = String.join("\n",
             "package com.acme.api {",
