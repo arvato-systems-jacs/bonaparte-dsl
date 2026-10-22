@@ -1374,6 +1374,8 @@ public class TypeScriptGeneratorTest {
         assertTrue(productApi, productApi.contains("create(data: ProductDTO,"));
         assertTrue(productApi, productApi.contains("extras: Partial<Omit<ProductCrudRequest, '@PQON' | 'crud' | 'data' | 'onlyActive' | 'source'>> & ProductCrudRequestExtras = {}"));
         assertTrue(productApi, productApi.contains("\n    create(data: ProductDTO,"));
+        assertTrue(productApi, productApi.contains("createResponse(data: Partial<ProductDTO>,"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
         assertTrue(productApi, productApi.contains("\n        return this.rpc.call<"));
         assertTrue(productApi, !productApi.matches("(?s).*\\n[ \\t]+\\n.*"));
         assertTrue(productApi, productApi.contains("read(key: number,"));

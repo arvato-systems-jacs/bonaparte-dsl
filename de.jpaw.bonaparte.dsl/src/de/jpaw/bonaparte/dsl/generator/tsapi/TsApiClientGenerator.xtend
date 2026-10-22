@@ -299,6 +299,10 @@ class TsApiClientGenerator {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapCrud<«dto»>));
             }
 
+            «"createResponse" + suffix»(data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapService<«wireType»>));
+            }
+
             «"read" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<«dto»> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'R', onlyActive: false, key }).pipe(map(unwrapCrud<«dto»>));
             }
