@@ -109,6 +109,9 @@ class TsApiClientGenerator {
             }
             if (info.responseRef !== null)
                 collectTypeImports(info.responseRef, imports)
+            if (supportsPolymorphicSearchFilter(info.request))
+                for (filterType : searchFilterSubclasses(info.request))
+                    imports.add(filterType)
         }
 
         val out = new StringBuilder
@@ -127,6 +130,10 @@ class TsApiClientGenerator {
             if (isCrud(info.pattern))
                 unwraps.add("unwrapVoid")
         }
+        if (requests.exists[responsePattern == TsRequestClassifier.ResponsePattern.SEARCH
+                || responsePattern == TsRequestClassifier.ResponsePattern.CRUD
+                || responsePattern == TsRequestClassifier.ResponsePattern.LEAN_SEARCH])
+            unwraps.add("unwrapService")
         if (!unwraps.empty)
             out.append("import { ").append(unwraps.join(", ")).append(" } from '")
                 .append(TsModuleResolver.runtimeSupportImport(requests.head.request, apiClass, "unwrap"))
@@ -156,6 +163,7 @@ class TsApiClientGenerator {
         out.append("export class ").append(apiClass).append(" {\n")
         out.append("    private readonly rpc = inject(RpcClient);\n")
         val usedMethods = new LinkedHashSet<String>
+        val methodNames = new LinkedHashMap<TsRequestClassifier.RequestInfo, String>
         for (info : requests) {
             var methodName = TsNaming.methodName(info.request.name, info.pattern, info.dtoName)
             if (isCrud(info.pattern))
@@ -164,6 +172,10 @@ class TsApiClientGenerator {
                 methodName = methodName + capitalize(info.request.name)
                 usedMethods.add(methodName)
             }
+            methodNames.put(info, methodName)
+        }
+        for (info : requests) {
+            val methodName = methodNames.get(info)
             val wireType = if (info.responseRef === null) "void" else renderType(info.responseRef)
             val resultType = resultType(info, wireType)
             val paramsType = requestParameterType(info)
@@ -178,6 +190,34 @@ class TsApiClientGenerator {
             out.append("    }\n")
             if (isCrud(info.pattern))
                 out.append(writeCrudMethods(info, methodName))
+            if (info.responsePattern == TsRequestClassifier.ResponsePattern.SEARCH
+                    || info.responsePattern == TsRequestClassifier.ResponsePattern.CRUD) {
+                var responseMethodName = methodName + "Response"
+                var suffix = 2
+                while (!usedMethods.add(responseMethodName)) {
+                    responseMethodName = methodName + "Response" + suffix
+                    suffix++
+                }
+                out.append("\n    ").append(responseMethodName).append("(params: ").append(paramsType)
+                    .append("): Observable<Omit<").append(wireType).append(", 'returnCode'>> {\n")
+                out.append("        return this.rpc.call<").append(wireType).append(">(")
+                    .append(info.request.name).append("PQON, ").append(paramsValue)
+                    .append(").pipe(map(unwrapService<").append(wireType).append(">));\n")
+                out.append("    }\n")
+            } else if (info.responsePattern == TsRequestClassifier.ResponsePattern.LEAN_SEARCH) {
+                var responseMethodName = methodName + "Response"
+                var suffix = 2
+                while (!usedMethods.add(responseMethodName)) {
+                    responseMethodName = methodName + "Response" + suffix
+                    suffix++
+                }
+                out.append("\n    ").append(responseMethodName).append("(params: ").append(paramsType)
+                    .append("): Observable<Omit<").append(wireType).append(", 'returnCode'>> {\n")
+                out.append("        return this.rpc.call<").append(wireType).append(">(")
+                    .append(info.request.name).append("PQON, ").append(paramsValue)
+                    .append(").pipe(map(unwrapService<").append(wireType).append(">));\n")
+                out.append("    }\n")
+            }
         }
         out.append("}\n")
         return out
@@ -188,15 +228,45 @@ class TsApiClientGenerator {
         excluded.add("'@PQON'")
         if (hasPaging(info.pattern))
             excluded.add("'offset'")
+        val filterTypes = if (supportsPolymorphicSearchFilter(info.request))
+                searchFilterSubclasses(info.request) else new ArrayList<ClassDefinition>
+        if (!filterTypes.empty)
+            excluded.add("'searchFilter'")
         if (hasNamedExtras(info))
             for (field : info.request.fields)
                 excluded.add("'" + field.name + "'")
         var result = "Omit<" + info.request.name + ", " + excluded.join(" | ") + ">"
         if (hasPaging(info.pattern))
             result += " & { offset?: number }"
+        if (!filterTypes.empty)
+            result += " & { searchFilter?: " + filterTypes.map[name].join(" | ") + " | null }"
         if (hasNamedExtras(info))
             result += " & " + extrasTypeName(info)
         return result
+    }
+
+    def private static boolean supportsPolymorphicSearchFilter(ClassDefinition request) {
+        if (findType(request, "SearchFilter") === null)
+            return false
+        var ClassDefinition current = request
+        while (current !== null) {
+            if (current.fields.exists[name == "searchFilter"])
+                return true
+            current = if (current.extendsClass === null) null else current.extendsClass.classRef
+        }
+        return false
+    }
+
+    def private static List<ClassDefinition> searchFilterSubclasses(ClassDefinition request) {
+        val base = findType(request, "SearchFilter")
+        if (base === null)
+            return new ArrayList<ClassDefinition>
+        val subclasses = new ArrayList<ClassDefinition>
+        for (source : request.eResource.resourceSet.resources)
+            for (candidate : source.allContents.toIterable.filter(typeof(ClassDefinition)))
+                if (candidate !== base && !candidate.isAbstract && extendsType(candidate, base))
+                    subclasses.add(candidate)
+        return subclasses
     }
 
     def private static CharSequence writeExtrasInterface(TsRequestClassifier.RequestInfo info) {
@@ -243,6 +313,10 @@ class TsApiClientGenerator {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapCrud<«dto»>));
             }
 
+            «"createResponse" + suffix»(data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapService<«wireType»>));
+            }
+
             «"read" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<«dto»> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'R', onlyActive: false, key }).pipe(map(unwrapCrud<«dto»>));
             }
@@ -251,8 +325,28 @@ class TsApiClientGenerator {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, key, data }).pipe(map(unwrapCrud<«dto»>));
             }
 
+            «"updateResponse" + suffix»(key: «ref», data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, key, data }).pipe(map(unwrapService<«wireType»>));
+            }
+
             «"delete" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'D', onlyActive: false, key }).pipe(map(unwrapVoid));
+            }
+
+            «"activate" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, key }).pipe(map(unwrapVoid));
+            }
+
+            «"activateResponse" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, key }).pipe(map(unwrapService<«wireType»>));
+            }
+
+            «"inactivate" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, key }).pipe(map(unwrapVoid));
+            }
+
+            «"inactivateResponse" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, key }).pipe(map(unwrapService<«wireType»>));
             }
         '''
         val naturalKeyMethods = if (info.pattern == TsRequestClassifier.Pattern.CRUD_SURROGATE) '''
@@ -265,8 +359,28 @@ class TsApiClientGenerator {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, naturalKey, data }).pipe(map(unwrapCrud<«dto»>));
             }
 
+            «"updateByNaturalKeyResponse" + suffix»(naturalKey: «naturalKeyRef», data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, naturalKey, data }).pipe(map(unwrapService<«wireType»>));
+            }
+
             «"deleteByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<void> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'D', onlyActive: false, naturalKey }).pipe(map(unwrapVoid));
+            }
+
+            «"activateByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, naturalKey }).pipe(map(unwrapVoid));
+            }
+
+            «"activateByNaturalKeyResponse" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, naturalKey }).pipe(map(unwrapService<«wireType»>));
+            }
+
+            «"inactivateByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, naturalKey }).pipe(map(unwrapVoid));
+            }
+
+            «"inactivateByNaturalKeyResponse" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, naturalKey }).pipe(map(unwrapService<«wireType»>));
             }
         ''' else ""
         return (methods.toString + naturalKeyMethods.toString).replaceAll("\\n(?=[ \\t]*\\S)", "\n    ")
