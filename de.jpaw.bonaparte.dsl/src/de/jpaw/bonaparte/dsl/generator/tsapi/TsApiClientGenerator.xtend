@@ -131,7 +131,8 @@ class TsApiClientGenerator {
                 unwraps.add("unwrapVoid")
         }
         if (requests.exists[responsePattern == TsRequestClassifier.ResponsePattern.SEARCH
-                || responsePattern == TsRequestClassifier.ResponsePattern.CRUD])
+                || responsePattern == TsRequestClassifier.ResponsePattern.CRUD
+                || responsePattern == TsRequestClassifier.ResponsePattern.LEAN_SEARCH])
             unwraps.add("unwrapService")
         if (!unwraps.empty)
             out.append("import { ").append(unwraps.join(", ")).append(" } from '")
@@ -191,6 +192,19 @@ class TsApiClientGenerator {
                 out.append(writeCrudMethods(info, methodName))
             if (info.responsePattern == TsRequestClassifier.ResponsePattern.SEARCH
                     || info.responsePattern == TsRequestClassifier.ResponsePattern.CRUD) {
+                var responseMethodName = methodName + "Response"
+                var suffix = 2
+                while (!usedMethods.add(responseMethodName)) {
+                    responseMethodName = methodName + "Response" + suffix
+                    suffix++
+                }
+                out.append("\n    ").append(responseMethodName).append("(params: ").append(paramsType)
+                    .append("): Observable<Omit<").append(wireType).append(", 'returnCode'>> {\n")
+                out.append("        return this.rpc.call<").append(wireType).append(">(")
+                    .append(info.request.name).append("PQON, ").append(paramsValue)
+                    .append(").pipe(map(unwrapService<").append(wireType).append(">));\n")
+                out.append("    }\n")
+            } else if (info.responsePattern == TsRequestClassifier.ResponsePattern.LEAN_SEARCH) {
                 var responseMethodName = methodName + "Response"
                 var suffix = 2
                 while (!usedMethods.add(responseMethodName)) {

@@ -1174,6 +1174,8 @@ public class TypeScriptGeneratorTest {
         String priceListApi = norm(files.get(ROOT + "t9t/a28coupon/request/PriceListApi.ts"));
         assertTrue(priceListApi, priceListApi.contains("leanSearch(params: Omit<PriceListLeanSearchRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<Description[]>"));
         assertTrue(priceListApi, priceListApi.contains("map(unwrapLean)"));
+        assertTrue(priceListApi, priceListApi.contains("leanSearchResponse(params: Omit<PriceListLeanSearchRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<Omit<LeanSearchResponse, 'returnCode'>>"));
+        assertTrue(priceListApi, priceListApi.contains("PriceListLeanSearchRequestPQON, { ...params, offset: params.offset ?? 0 }).pipe(map(unwrapService<LeanSearchResponse>))"));
     }
 
     @Test
