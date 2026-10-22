@@ -307,6 +307,10 @@ class TsApiClientGenerator {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, key, data }).pipe(map(unwrapCrud<«dto»>));
             }
 
+            «"updateResponse" + suffix»(key: «ref», data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, key, data }).pipe(map(unwrapService<«wireType»>));
+            }
+
             «"delete" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'D', onlyActive: false, key }).pipe(map(unwrapVoid));
             }
@@ -319,6 +323,10 @@ class TsApiClientGenerator {
 
             «"updateByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<«dto»> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, naturalKey, data }).pipe(map(unwrapCrud<«dto»>));
+            }
+
+            «"updateByNaturalKeyResponse" + suffix»(naturalKey: «naturalKeyRef», data: Partial<«dto»>, extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'U', onlyActive: false, naturalKey, data }).pipe(map(unwrapService<«wireType»>));
             }
 
             «"deleteByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<void> {

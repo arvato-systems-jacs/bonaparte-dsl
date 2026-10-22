@@ -1248,6 +1248,8 @@ public class TypeScriptGeneratorTest {
         assertTrue(api, api.contains("map(unwrapService<ReadAllResponse<ProductDTO, FullTracking>>)"));
         assertTrue(api, api.contains("executeResponse(params: Omit<ProductCrudRequest, '@PQON'>): Observable<Omit<CrudSurrogateResponse<ProductDTO, FullTracking>, 'returnCode'>>"));
         assertTrue(api, api.contains("map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>)"));
+        assertTrue(api, api.contains("updateResponse(key: number, data: Partial<ProductDTO>,"));
+        assertTrue(api, api.contains("Observable<Omit<CrudSurrogateResponse<ProductDTO, FullTracking>, 'returnCode'>>"));
         assertTrue(api, api.contains("execute(params: Omit<ProductCrudRequest, '@PQON'>): Observable<ProductDTO>"));
         assertTrue(api, api.contains("search(params: Omit<ProductSearchRequest, '@PQON' | 'offset' | 'searchFilter'> & { offset?: number } & { searchFilter?: StringFilter | BooleanFilter | AndFilter | null }): Observable<ProductDTO[]>"));
     }
@@ -1376,9 +1378,11 @@ public class TypeScriptGeneratorTest {
         assertTrue(productApi, !productApi.matches("(?s).*\\n[ \\t]+\\n.*"));
         assertTrue(productApi, productApi.contains("read(key: number,"));
         assertTrue(productApi, productApi.contains("update(key: number, data: Partial<ProductDTO>,"));
+        assertTrue(productApi, productApi.contains("updateResponse(key: number, data: Partial<ProductDTO>,"));
         assertTrue(productApi, productApi.contains("delete(key: number,"));
         assertTrue(productApi, productApi.contains("readByNaturalKey(naturalKey: ProductRef | ProductNaturalRef,"));
         assertTrue(productApi, productApi.contains("updateByNaturalKey(naturalKey: ProductRef | ProductNaturalRef, data: Partial<ProductDTO>,"));
+        assertTrue(productApi, productApi.contains("updateByNaturalKeyResponse(naturalKey: ProductRef | ProductNaturalRef, data: Partial<ProductDTO>,"));
         assertTrue(productApi, productApi.contains("deleteByNaturalKey(naturalKey: ProductRef | ProductNaturalRef,"));
         assertTrue(productApi, productApi.contains("readByNaturalKeyViaApi(naturalKey: ProductRef | ProductNaturalRef,"));
         assertTrue(productApi, productApi.contains("crud: 'C', onlyActive: false, data"));
@@ -1386,6 +1390,8 @@ public class TypeScriptGeneratorTest {
         assertTrue(productApi, productApi.contains("crud: 'R', onlyActive: false, naturalKey"));
         assertTrue(productApi, productApi.contains("crud: 'U', onlyActive: false, key, data"));
         assertTrue(productApi, productApi.contains("crud: 'U', onlyActive: false, naturalKey, data"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'U', onlyActive: false, key, data }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'U', onlyActive: false, naturalKey, data }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
         assertTrue(productApi, productApi.contains("crud: 'D', onlyActive: false, key"));
         assertTrue(productApi, productApi.contains("crud: 'D', onlyActive: false, naturalKey"));
         assertTrue(productApi, productApi.contains("executeViaApi(params: Omit<ProductCrudViaApiRequest, '@PQON'>)"));
