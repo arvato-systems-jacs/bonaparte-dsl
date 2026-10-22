@@ -332,6 +332,22 @@ class TsApiClientGenerator {
             «"delete" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'D', onlyActive: false, key }).pipe(map(unwrapVoid));
             }
+
+            «"activate" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, key }).pipe(map(unwrapVoid));
+            }
+
+            «"activateResponse" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, key }).pipe(map(unwrapService<«wireType»>));
+            }
+
+            «"inactivate" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, key }).pipe(map(unwrapVoid));
+            }
+
+            «"inactivateResponse" + suffix»(key: «ref», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, key }).pipe(map(unwrapService<«wireType»>));
+            }
         '''
         val naturalKeyMethods = if (info.pattern == TsRequestClassifier.Pattern.CRUD_SURROGATE) '''
 
@@ -349,6 +365,22 @@ class TsApiClientGenerator {
 
             «"deleteByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<void> {
                 return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'D', onlyActive: false, naturalKey }).pipe(map(unwrapVoid));
+            }
+
+            «"activateByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, naturalKey }).pipe(map(unwrapVoid));
+            }
+
+            «"activateByNaturalKeyResponse" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'A', onlyActive: false, naturalKey }).pipe(map(unwrapService<«wireType»>));
+            }
+
+            «"inactivateByNaturalKey" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<void> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, naturalKey }).pipe(map(unwrapVoid));
+            }
+
+            «"inactivateByNaturalKeyResponse" + suffix»(naturalKey: «naturalKeyRef», extras: «extrasType»«extrasDefault»): Observable<Omit<«wireType», 'returnCode'>> {
+                return this.rpc.call<«wireType»>(«info.request.name»PQON, { ...extras, crud: 'I', onlyActive: false, naturalKey }).pipe(map(unwrapService<«wireType»>));
             }
         ''' else ""
         return (methods.toString + naturalKeyMethods.toString).replaceAll("\\n(?=[ \\t]*\\S)", "\n    ")

@@ -38,6 +38,14 @@ The TypeScript API generator is maintained in
 tests are in `de.jpaw.bonaparte.dsl.tests`. Use Java 21 and install the Tycho
 target definitions locally before running the generator test reactor:
 
+Generated CRUD services retain the full `OperationType` on their generic
+`execute` / `executeResponse` methods. They also provide convenience methods for
+create, read, update, delete, activate, and inactivate; surrogate-key services
+add natural-key variants where applicable. Response-preserving helpers are
+generated for create, update, activate, and inactivate. Other operation kinds
+remain available through each request's generic typed service method rather
+than being synthesized as CRUD helpers.
+
 ```sh
 mvn --batch-mode --no-transfer-progress \
   -pl de.jpaw.bonaparte.dsl.target,de.jpaw.bonaparte.jpa.dsl.target install
