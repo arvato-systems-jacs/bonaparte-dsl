@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: de.jpaw.bonaparte.dsl.tests
 Bundle-Vendor: Michael Bischoff
-Bundle-Version: 7.0.4
+Bundle-Version: 7.0.5.qualifier
 Bundle-SymbolicName: de.jpaw.bonaparte.dsl.tests;singleton:=true
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Require-Bundle: de.jpaw.bonaparte.dsl,
