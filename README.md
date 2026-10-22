@@ -31,6 +31,53 @@ The generated Java classes need support libraries. These are:
 
 The project uses a multi module maven based build.
 
+## Developing the TypeScript API generator
+
+The TypeScript API generator is maintained in
+`de.jpaw.bonaparte.dsl/src/de/jpaw/bonaparte/dsl/generator/tsapi`; its focused
+tests are in `de.jpaw.bonaparte.dsl.tests`. Use Java 21 and install the Tycho
+target definitions locally before running the generator test reactor:
+
+Generated CRUD services retain the full `OperationType` on their generic
+`execute` / `executeResponse` methods. They also provide convenience methods for
+create, read, update, delete, activate, and inactivate; surrogate-key services
+add natural-key variants where applicable. Response-preserving helpers are
+generated for create, update, activate, and inactivate. Other operation kinds
+remain available through each request's generic typed service method rather
+than being synthesized as CRUD helpers.
+
+```sh
+mvn --batch-mode --no-transfer-progress \
+  -pl de.jpaw.bonaparte.dsl.target,de.jpaw.bonaparte.jpa.dsl.target install
+
+mvn --batch-mode --no-transfer-progress \
+  -pl de.jpaw.bonaparte.dsl,de.jpaw.bonaparte.dsl.tests -am verify
+```
+
+After the tests pass, install the local JPA DSL and TypeScript plugin artifacts
+so downstream t9t builds can resolve the generator version from the local Maven
+repository:
+
+```sh
+mvn --batch-mode --no-transfer-progress \
+  -pl de.jpaw.bonaparte.jpa.dsl -am install -DskipTests
+mvn --batch-mode --no-transfer-progress \
+  -pl de.jpaw.bonaparte.dsl.typescript.plugin -am install -DskipTests
+
+export BONAPARTE_PLUGIN_VERSION="$(mvn -q -N help:evaluate \
+  -Dexpression=project.version -DforceStdout)"
+```
+
+Pass `BONAPARTE_PLUGIN_VERSION` to the downstream t9t build as
+`-Dbonaparte-plugin.version="$BONAPARTE_PLUGIN_VERSION"`; the default plugin
+version in the t9t parent may not include local generator changes. The complete
+t9t API build, local Verdaccio workflow, GitHub Packages snapshot publication,
+and package-auth instructions are documented in
+`t9t-api-ts/src/main/npm/README.md` in the t9t repository. GitHub package reads
+require `read:packages`; snapshot publishing requires `write:packages`. Keep
+tokens in environment variables or approved credential stores, never in
+tracked files.
+
 ## How to install
 
 Install the Eclipse plugins with the help of provided update sites.

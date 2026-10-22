@@ -1174,6 +1174,8 @@ public class TypeScriptGeneratorTest {
         String priceListApi = norm(files.get(ROOT + "t9t/a28coupon/request/PriceListApi.ts"));
         assertTrue(priceListApi, priceListApi.contains("leanSearch(params: Omit<PriceListLeanSearchRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<Description[]>"));
         assertTrue(priceListApi, priceListApi.contains("map(unwrapLean)"));
+        assertTrue(priceListApi, priceListApi.contains("leanSearchResponse(params: Omit<PriceListLeanSearchRequest, '@PQON' | 'offset'> & { offset?: number }): Observable<Omit<LeanSearchResponse, 'returnCode'>>"));
+        assertTrue(priceListApi, priceListApi.contains("PriceListLeanSearchRequestPQON, { ...params, offset: params.offset ?? 0 }).pipe(map(unwrapService<LeanSearchResponse>))"));
     }
 
     @Test
@@ -1216,6 +1218,42 @@ public class TypeScriptGeneratorTest {
         } finally {
             restoreSystemProperty("bonaparte.TypeScript.apiNamingFile", previousNamingFile);
         }
+    }
+
+    @Test
+    public void generatedApiServicesExposeTypedResponsePreservingMethods() throws Exception {
+        String source = String.join("\n",
+            "package com.acme.api {",
+            "    class ServiceResponse {}",
+            "    class SearchResponse<DATA, TRACKING> extends ServiceResponse {}",
+            "    class ReadAllResponse<DATA, TRACKING> extends SearchResponse<!DATA, !TRACKING> {}",
+            "    class CrudAnyKeyResponse<DATA, TRACKING> extends ServiceResponse { optional (!DATA) data; optional long key; }",
+            "    class CrudSurrogateResponse<DATA, TRACKING> extends CrudAnyKeyResponse<!DATA, !TRACKING> {}",
+            "    abstract class SearchFilter {}",
+            "    class StringFilter extends SearchFilter {}",
+            "    class BooleanFilter extends SearchFilter {}",
+            "    class AndFilter extends SearchFilter {}",
+            "    class SearchCriteria { optional (SearchFilter...) searchFilter; }",
+            "    class SearchRequest<DATA, TRACKING> extends SearchCriteria return ReadAllResponse<!DATA, !TRACKING> {}",
+            "    class CrudSurrogateKeyRequest<REF, DATA, TRACKING> return CrudSurrogateResponse<!DATA, !TRACKING> {}",
+            "    class ProductDTO {}",
+            "    class ProductRef {}",
+            "    class FullTracking {}",
+            "    class ProductSearchRequest extends SearchRequest<ProductDTO, FullTracking> {}",
+            "    class ProductCrudRequest extends CrudSurrogateKeyRequest<ProductRef, ProductDTO, FullTracking> {}",
+            "}",
+            "");
+
+        String api = norm(generateApis(source).get(ROOT + "com/acme/api/ProductApi.ts"));
+
+        assertTrue(api, api.contains("searchResponse(params: Omit<ProductSearchRequest, '@PQON' | 'offset' | 'searchFilter'> & { offset?: number } & { searchFilter?: StringFilter | BooleanFilter | AndFilter | null }): Observable<Omit<ReadAllResponse<ProductDTO, FullTracking>, 'returnCode'>>"));
+        assertTrue(api, api.contains("map(unwrapService<ReadAllResponse<ProductDTO, FullTracking>>)"));
+        assertTrue(api, api.contains("executeResponse(params: Omit<ProductCrudRequest, '@PQON'>): Observable<Omit<CrudSurrogateResponse<ProductDTO, FullTracking>, 'returnCode'>>"));
+        assertTrue(api, api.contains("map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>)"));
+        assertTrue(api, api.contains("updateResponse(key: number, data: Partial<ProductDTO>,"));
+        assertTrue(api, api.contains("Observable<Omit<CrudSurrogateResponse<ProductDTO, FullTracking>, 'returnCode'>>"));
+        assertTrue(api, api.contains("execute(params: Omit<ProductCrudRequest, '@PQON'>): Observable<ProductDTO>"));
+        assertTrue(api, api.contains("search(params: Omit<ProductSearchRequest, '@PQON' | 'offset' | 'searchFilter'> & { offset?: number } & { searchFilter?: StringFilter | BooleanFilter | AndFilter | null }): Observable<ProductDTO[]>"));
     }
 
     @Test
@@ -1338,22 +1376,44 @@ public class TypeScriptGeneratorTest {
         assertTrue(productApi, productApi.contains("create(data: ProductDTO,"));
         assertTrue(productApi, productApi.contains("extras: Partial<Omit<ProductCrudRequest, '@PQON' | 'crud' | 'data' | 'onlyActive' | 'source'>> & ProductCrudRequestExtras = {}"));
         assertTrue(productApi, productApi.contains("\n    create(data: ProductDTO,"));
+        assertTrue(productApi, productApi.contains("createResponse(data: Partial<ProductDTO>,"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'C', onlyActive: false, data }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
         assertTrue(productApi, productApi.contains("\n        return this.rpc.call<"));
         assertTrue(productApi, !productApi.matches("(?s).*\\n[ \\t]+\\n.*"));
         assertTrue(productApi, productApi.contains("read(key: number,"));
         assertTrue(productApi, productApi.contains("update(key: number, data: Partial<ProductDTO>,"));
+        assertTrue(productApi, productApi.contains("updateResponse(key: number, data: Partial<ProductDTO>,"));
         assertTrue(productApi, productApi.contains("delete(key: number,"));
+        assertTrue(productApi, productApi.contains("activate(key: number,"));
+        assertTrue(productApi, productApi.contains("activateResponse(key: number,"));
+        assertTrue(productApi, productApi.contains("inactivate(key: number,"));
+        assertTrue(productApi, productApi.contains("inactivateResponse(key: number,"));
         assertTrue(productApi, productApi.contains("readByNaturalKey(naturalKey: ProductRef | ProductNaturalRef,"));
         assertTrue(productApi, productApi.contains("updateByNaturalKey(naturalKey: ProductRef | ProductNaturalRef, data: Partial<ProductDTO>,"));
+        assertTrue(productApi, productApi.contains("updateByNaturalKeyResponse(naturalKey: ProductRef | ProductNaturalRef, data: Partial<ProductDTO>,"));
         assertTrue(productApi, productApi.contains("deleteByNaturalKey(naturalKey: ProductRef | ProductNaturalRef,"));
+        assertTrue(productApi, productApi.contains("activateByNaturalKey(naturalKey: ProductRef | ProductNaturalRef,"));
+        assertTrue(productApi, productApi.contains("activateByNaturalKeyResponse(naturalKey: ProductRef | ProductNaturalRef,"));
+        assertTrue(productApi, productApi.contains("inactivateByNaturalKey(naturalKey: ProductRef | ProductNaturalRef,"));
+        assertTrue(productApi, productApi.contains("inactivateByNaturalKeyResponse(naturalKey: ProductRef | ProductNaturalRef,"));
         assertTrue(productApi, productApi.contains("readByNaturalKeyViaApi(naturalKey: ProductRef | ProductNaturalRef,"));
         assertTrue(productApi, productApi.contains("crud: 'C', onlyActive: false, data"));
         assertTrue(productApi, productApi.contains("crud: 'R', onlyActive: false, key"));
         assertTrue(productApi, productApi.contains("crud: 'R', onlyActive: false, naturalKey"));
         assertTrue(productApi, productApi.contains("crud: 'U', onlyActive: false, key, data"));
         assertTrue(productApi, productApi.contains("crud: 'U', onlyActive: false, naturalKey, data"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'U', onlyActive: false, key, data }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'U', onlyActive: false, naturalKey, data }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
         assertTrue(productApi, productApi.contains("crud: 'D', onlyActive: false, key"));
         assertTrue(productApi, productApi.contains("crud: 'D', onlyActive: false, naturalKey"));
+        assertTrue(productApi, productApi.contains("crud: 'A', onlyActive: false, key"));
+        assertTrue(productApi, productApi.contains("crud: 'A', onlyActive: false, naturalKey"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'A', onlyActive: false, key }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'A', onlyActive: false, naturalKey }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
+        assertTrue(productApi, productApi.contains("crud: 'I', onlyActive: false, key"));
+        assertTrue(productApi, productApi.contains("crud: 'I', onlyActive: false, naturalKey"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'I', onlyActive: false, key }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
+        assertTrue(productApi, productApi.contains("ProductCrudRequestPQON, { ...extras, crud: 'I', onlyActive: false, naturalKey }).pipe(map(unwrapService<CrudSurrogateResponse<ProductDTO, FullTracking>>))"));
         assertTrue(productApi, productApi.contains("executeViaApi(params: Omit<ProductCrudViaApiRequest, '@PQON'>)"));
         assertTrue(productApi, productApi.contains("createViaApi(data: ProductDTO,"));
         assertTrue(productApi, productApi.contains("readUser(key: string,"));
